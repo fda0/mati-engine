@@ -26,8 +26,8 @@ CastlingRights :: enum_flags u8
   BLACK_QUEENSIDE;
 }
 
-Field :: #type u64;
-Square :: #type u8;
+Field :: #type u64; // 8x8 bitfield - encodes occupancy for the whole board
+Square :: #type s8; // [0:63] - encodes a single position on the board
 
 Board :: struct
 {
@@ -63,7 +63,12 @@ INIT_BOARD_FEN :: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 SquareFromVec2 :: inline (vec: Vec2) -> Square { return xx (vec.y*8 + vec.x); }
 Vec2FromSquare :: inline (s: Square) -> Vec2 { return {xx (s & 7), xx (s >> 3)}; }
-FieldFromSquare :: inline (s: Square) -> Field { return (cast(u64)1) << s; }
+IsValidSquare :: inline (s: Square) -> bool { return s < 64 && s >= 0; }
+FieldFromSquare :: inline (s: Square) -> Field
+{
+  assert(IsValidSquare(s));
+  return (cast(u64)1) << s;
+}
 FieldFromVec2 :: inline (vec: Vec2) -> Field { return FieldFromSquare(SquareFromVec2(vec)); }
 FirstSquareInField :: inline (field: Field) -> Square { return xx (bit_scan_forward(field) - 1); }
 
@@ -110,16 +115,9 @@ BoardFromFen :: (text: string) -> Board
 
 LegalMovesFromBoard :: (board: Board) -> MoveArray
 {
-  UNDER_4TH_BIT_MASK :: (7).(u64);
-  ABOVE_3RD_BIT_MASK :: (~7).(u64);
-
   DoesNotChangeRow :: inline (from: Square, to: Square) -> bool
   {
-    return ((from ^ to) & ABOVE_3RD_BIT_MASK) == 0;
-  }
-  DoesNotChangeCol :: inline (from: Square, to: Square) -> bool
-  {
-    return ((from ^ to) & UNDER_4TH_BIT_MASK) == 0;
+    return ((from ^ to) & (~7)) == 0;
   }
 
   moves: MoveArray;
@@ -141,7 +139,7 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
 
   TestAddMove :: (from: Square, to: Square) #expand
   {
-    if to != 0
+    if IsValidSquare(to)
     {
       to_field := FieldFromSquare(to);
       if (to_field & our_field_sum) == 0
@@ -168,20 +166,14 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
       if piece_flag & (.PAWN_FLAG | .ROOK_FLAG | .QUEEN_FLAG | .KING_FLAG)
       {
         candidate_square := current_square + 8;
-        if DoesNotChangeCol(current_square, candidate_square)
-        {
-          TestAddMove(current_square, candidate_square);
-        }
+        TestAddMove(current_square, candidate_square);
       }
 
       // Move up
       if piece_flag & (.PAWN_FLAG | .ROOK_FLAG | .QUEEN_FLAG | .KING_FLAG)
       {
         candidate_square := current_square - 8;
-        if DoesNotChangeCol(current_square, candidate_square)
-        {
-          TestAddMove(current_square, candidate_square);
-        }
+        TestAddMove(current_square, candidate_square);
       }
 
       // Move left
@@ -203,15 +195,6 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
           TestAddMove(current_square, candidate_square);
         }
       }
-
-      // if piece_idx.(Piece) == {
-      //   case .PAWN;
-      //   case .KNIGHT;
-      //   case .BISHOP;
-      //   case .ROOK;
-      //   case .QUEEN;
-      //   case .KING;
-      // }
     }
   }
 
