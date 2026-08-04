@@ -63,14 +63,14 @@ INIT_BOARD_FEN :: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 SquareFromVec2 :: inline (vec: Vec2) -> Square { return xx (vec.y*8 + vec.x); }
 Vec2FromSquare :: inline (s: Square) -> Vec2 { return {xx (s & 7), xx (s >> 3)}; }
-FieldFromSquare :: inline (s: Square) -> Field { return xx (1 << s); }
+FieldFromSquare :: inline (s: Square) -> Field { return (cast(u64)1) << s; }
 FieldFromVec2 :: inline (vec: Vec2) -> Field { return FieldFromSquare(SquareFromVec2(vec)); }
 FirstSquareInField :: inline (field: Field) -> Square { return xx (bit_scan_forward(field) - 1); }
 
 IsUpper :: (a: u8) -> bool { return a >= #char "A" && a <= #char "Z"; }
 IsLower :: (a: u8) -> bool { return a >= #char "a" && a <= #char "z"; }
 IsDigit :: (a: u8) -> bool { return a >= #char "0" && a <= #char "9"; }
-ToLower :: (a: u8) -> u8 { return a - (ifx IsUpper(a) #char "a" - #char "A").(u8); }
+ToLower :: (a: u8) -> u8 { return a + (ifx IsUpper(a) #char "a" - #char "A").(u8); }
 ParseDigit :: (a: u8) -> s8 { return xx (a - #char "0"); }
 
 BoardFromFen :: (text: string) -> Board
@@ -102,17 +102,24 @@ BoardFromFen :: (text: string) -> Board
     field_bit := FieldFromVec2(pos);
     board.fields[piece] |= field_bit;
     board.is_black |= ifx is_black then field_bit;
+
+    pos.x += 1;
   }
   return board;
 }
 
 LegalMovesFromBoard :: (board: Board) -> MoveArray
 {
+  UNDER_4TH_BIT_MASK :: (7).(u64);
   ABOVE_3RD_BIT_MASK :: (~7).(u64);
 
-  DoesNotOverflowRow :: inline (from: Square, to: Square) -> bool
+  DoesNotChangeRow :: inline (from: Square, to: Square) -> bool
   {
-    return (from ^ to & ABOVE_3RD_BIT_MASK) == 0;
+    return ((from ^ to) & ABOVE_3RD_BIT_MASK) == 0;
+  }
+  DoesNotChangeCol :: inline (from: Square, to: Square) -> bool
+  {
+    return ((from ^ to) & UNDER_4TH_BIT_MASK) == 0;
   }
 
   moves: MoveArray;
@@ -122,62 +129,76 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
     moves.count += 1;
   }
 
-  color_mask := ifx board.black_to_move then board.is_black else ~board.is_black;
+  our_color_mask := ifx board.black_to_move then board.is_black else ~board.is_black;
 
-  for all_field, field_idx: board.fields
+  our_field_sum: Field;
+  enemy_field_sum: Field;
+  for board.fields
   {
-    piece_flag := (1 << field_idx).(PieceFlags);
+    our_field_sum |= it & our_color_mask;
+    enemy_field_sum |= it & ~our_color_mask;
+  }
 
-    our_field := all_field & color_mask;
-    enemy_field := all_field & ~color_mask;
-
-    TestAddMove :: (from: Square, to: Square) #expand
+  TestAddMove :: (from: Square, to: Square) #expand
+  {
+    if to != 0
     {
-      if to != 0
+      to_field := FieldFromSquare(to);
+      if (to_field & our_field_sum) == 0
       {
-        to_field := FieldFromSquare(to);
-        if (to_field & enemy_field) == 0
-        {
-          AddMove(from, to);
-        }
+        AddMove(from, to);
       }
     }
+  }
 
-    to_check_field := our_field;
+  for piece_field_both_sides, piece_idx: board.fields
+  {
+    piece_flag := (1 << piece_idx).(PieceFlags);
+    our_piece_field := piece_field_both_sides & our_color_mask;
+
+    to_check_field := our_piece_field;
     while to_check_field
     {
       current_square := FirstSquareInField(to_check_field);
-      to_check_field &= ~(cast(u64)1 << current_square);
+      to_check_field &= ~((cast(u64)1) << current_square);
+
+       // @todo think about: the loop could operate on fields instead of squares
 
       // Move down
       if piece_flag & (.PAWN_FLAG | .ROOK_FLAG | .QUEEN_FLAG | .KING_FLAG)
       {
-        candidate_square := current_square << 8;
-        TestAddMove(current_square, candidate_square);
+        candidate_square := current_square + 8;
+        if DoesNotChangeCol(current_square, candidate_square)
+        {
+          TestAddMove(current_square, candidate_square);
+        }
       }
 
       // Move up
       if piece_flag & (.PAWN_FLAG | .ROOK_FLAG | .QUEEN_FLAG | .KING_FLAG)
       {
-        candidate_square := current_square >> 8;
-        TestAddMove(current_square, candidate_square);
+        candidate_square := current_square - 8;
+        if DoesNotChangeCol(current_square, candidate_square)
+        {
+          TestAddMove(current_square, candidate_square);
+        }
       }
 
       // Move left
-      if piece_flag & (.PAWN_FLAG | .ROOK_FLAG | .QUEEN_FLAG | .KING_FLAG)
+      if piece_flag & (.ROOK_FLAG | .QUEEN_FLAG | .KING_FLAG)
       {
         candidate_square := current_square - 1;
-        if DoesNotOverflowRow(current_square, candidate_square)
+        if DoesNotChangeRow(current_square, candidate_square)
         {
           TestAddMove(current_square, candidate_square);
         }
       }
 
       // Move right
-      if piece_flag & (.PAWN_FLAG | .ROOK_FLAG | .QUEEN_FLAG | .KING_FLAG)
+      if piece_flag & (.ROOK_FLAG | .QUEEN_FLAG | .KING_FLAG)
       {
         candidate_square := current_square + 1;
-        if DoesNotOverflowRow(current_square, candidate_square)
+        if DoesNotChangeRow(current_square, candidate_square)
         {
           TestAddMove(current_square, candidate_square);
         }
@@ -202,6 +223,7 @@ PrettyPrintVec2 :: (vec: Vec2)
   char := (vec.x + #char "A").(u8);
   str := string.{data = *char, count = 1};
   print("%%", str, 8 - vec.y);
+  print(" (raw %)", vec);
 }
 
 PrettyPrintMove :: (board: Board, move: Move)
