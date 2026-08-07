@@ -23,11 +23,11 @@ UciReadLine :: () -> string, bool
   return builder_to_string(*builder), true;
 }
 
-UciMoveFromString :: (text: string) -> Move, Piece, bool
+UciMoveFromString :: (text: string) -> Move, Piece
 {
   move: Move;
   promotion: Piece;
-  if text.count < 4 return move, promotion, false;
+  assert(text.count >= 4);
 
   fx := text[0] - #char "a";
   fy := text[1] - #char "1";
@@ -47,7 +47,7 @@ UciMoveFromString :: (text: string) -> Move, Piece, bool
       case #char "q"; promotion = .QUEEN;
     }
   }
-  return move, promotion, true;
+  return move, promotion;
 }
 
 UciStringFromMove :: (move: Move) -> FixedArray(u8, 32)
@@ -82,8 +82,8 @@ UciSetPosition :: (board: *Board, content: string)
     while all_moves
     {
       move_str := Prefix(all_moves, Find(all_moves, " "));
-      move, promotion, ok := UciMoveFromString(move_str);
-      if ok MakeMove(board, move, promotion);
+      move, promotion := UciMoveFromString(move_str);
+      MakeMove(board, move, promotion);
 
       all_moves = StripWhite(Skip(all_moves, move_str.count));
     }
