@@ -1,5 +1,7 @@
 .build/
+*.dSYM/
 *.exe
 *.pdb
 *.obj
 *.rdi
+mati

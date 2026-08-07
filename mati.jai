@@ -115,10 +115,13 @@ BoardFromFen :: (text: string) -> Board
 
 LegalMovesFromBoard :: (board: Board) -> MoveArray
 {
-  DoesNotChangeRow :: inline (from: Square, to: Square) -> bool
+  IsSameRow :: inline (from: Square, to: Square) -> bool
   {
     return ((from ^ to) & (~7)) == 0;
   }
+
+  ROW_2 :: #run SquareFromVec2({0, 2});
+  ROW_6 :: #run SquareFromVec2({0, 6});
 
   moves: MoveArray;
   AddMove :: (from: Square, to: Square) #expand
@@ -137,16 +140,19 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
     enemy_field_sum |= it & ~our_color_mask;
   }
 
-  TestAddMove :: (from: Square, to: Square) #expand
+  TestAddMove :: (from: Square, to: Square) -> bool #expand
   {
+    result := false;
     if IsValidSquare(to)
     {
       to_field := FieldFromSquare(to);
       if (to_field & our_field_sum) == 0
       {
         AddMove(from, to);
+        result = true;
       }
     }
+    return result;
   }
 
   for piece_field_both_sides, piece_idx: board.fields
@@ -160,7 +166,27 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
       current_square := FirstSquareInField(to_check_field);
       to_check_field &= ~((cast(u64)1) << current_square);
 
-       // @todo think about: the loop could operate on fields instead of squares
+      move_up_count := 0;
+      if piece_flag & (.ROOK_FLAG | .QUEEN_FLAG)
+      {
+        move_up_count = 8;
+      }
+      if piece_flag & (.KING_FLAG)
+      {
+        move_up_count = 1;
+      }
+      if piece_flag & (.PAWN_FLAG)
+      {
+        move_up_count = 1;
+        if IsSameRow(current_square, ROW_2) move_up_count += 1;
+      }
+
+      // Move up
+      for 1 .. move_up_count
+      {
+        candidate_square := (current_square - 8 * it).(Square);
+        if !TestAddMove(current_square, candidate_square) break;
+      }
 
       // Move down
       if piece_flag & (.PAWN_FLAG | .ROOK_FLAG | .QUEEN_FLAG | .KING_FLAG)
@@ -169,18 +195,11 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
         TestAddMove(current_square, candidate_square);
       }
 
-      // Move up
-      if piece_flag & (.PAWN_FLAG | .ROOK_FLAG | .QUEEN_FLAG | .KING_FLAG)
-      {
-        candidate_square := current_square - 8;
-        TestAddMove(current_square, candidate_square);
-      }
-
       // Move left
       if piece_flag & (.ROOK_FLAG | .QUEEN_FLAG | .KING_FLAG)
       {
         candidate_square := current_square - 1;
-        if DoesNotChangeRow(current_square, candidate_square)
+        if IsSameRow(current_square, candidate_square)
         {
           TestAddMove(current_square, candidate_square);
         }
@@ -190,7 +209,7 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
       if piece_flag & (.ROOK_FLAG | .QUEEN_FLAG | .KING_FLAG)
       {
         candidate_square := current_square + 1;
-        if DoesNotChangeRow(current_square, candidate_square)
+        if IsSameRow(current_square, candidate_square)
         {
           TestAddMove(current_square, candidate_square);
         }
