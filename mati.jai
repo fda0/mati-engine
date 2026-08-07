@@ -49,6 +49,7 @@ Move :: struct
 {
   from: Square;
   to: Square;
+  promotion: Piece;
 }
 MoveArray :: struct
 {
@@ -60,6 +61,8 @@ PIECE_COUNT :: #run enum_highest_value(Piece) + 1;
 MAX_LEGAL_MOVES :: 256;
 
 INIT_BOARD_FEN :: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+PieceFlagsFromPiece :: (piece: Piece) -> PieceFlags { return xx (1 << piece); }
 
 SquareFromVec2 :: inline (vec: Vec2) -> Square { return xx (vec.y*8 + vec.x); }
 Vec2FromSquare :: inline (s: Square) -> Vec2 { return {xx (s & 7), xx (s >> 3)}; }
@@ -124,9 +127,9 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
   ROW_6 :: #run SquareFromVec2({0, 6});
 
   moves: MoveArray;
-  AddMove :: (from: Square, to: Square) #expand
+  AddMove :: (from: Square, to: Square, promotion := Piece.PAWN) #expand
   {
-    moves.buffer[moves.count] = {from, to};
+    moves.buffer[moves.count] = {from, to, promotion};
     moves.count += 1;
   }
 
@@ -160,7 +163,7 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
 
   for field, piece_idx: board.fields
   {
-    piece_flag := (1 << piece_idx).(PieceFlags);
+    piece_flag := PieceFlagsFromPiece(xx piece_idx);
     our_field := field & our_color_mask;
 
     our_filed_left_to_check := our_field;
@@ -227,6 +230,41 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
   return moves;
 }
 
+MakeMove :: (board: *Board, move: Move, promotion := Piece.PAWN)
+{
+  from_field := FieldFromSquare(move.from);
+  to_field := FieldFromSquare(move.to);
+
+  moving_piece: PieceFlags;
+  for * board.fields
+  {
+    if it.* & from_field then moving_piece |= PieceFlagsFromPiece(xx it_index);
+    it.* &= ~to_field; // remove any captured piece
+  }
+  assert(popcount(moving_piece) == 1);
+
+  board.fields[moving_piece] &= ~from_field;
+
+  promotion_flag := PieceFlagsFromPiece(promotion);
+  if promotion_flag & (.KNIGHT_FLAG | .BISHOP_FLAG | .ROOK_FLAG | .QUEEN_FLAG)
+  {
+    board.fields[promotion] |= to_field;
+  }
+  else
+  {
+    board.fields[moving_piece] |= to_field;
+  }
+
+  board.is_black &= ~to_field;
+  if from_field & board.is_black
+  {
+    board.is_black &= ~from_field;
+    board.is_black |= to_field;
+  }
+
+  board.black_to_move = !board.black_to_move;
+}
+
 PrettyPrintVec2 :: (vec: Vec2)
 {
   char := (vec.x + #char "A").(u8);
@@ -254,6 +292,19 @@ PrettyPrintMove :: (board: Board, move: Move)
   print("\n");
 }
 
+FullRandomNumber :: () -> u64
+{
+  uci_rng_state ^= uci_rng_state << 13;
+  uci_rng_state ^= uci_rng_state >> 7;
+  uci_rng_state ^= uci_rng_state << 17;
+  return uci_rng_state;
+}
+
+RandomNumberInRange :: (max: u64) -> u64
+{
+  return FullRandomNumber() % max;
+}
+
 main :: ()
 {
   test_init_moves: bool;
@@ -277,10 +328,19 @@ main :: ()
       PrettyPrintMove(board, moves.buffer[it]);
     }
   }
-
-  // @todo implement uci
-
+  else
+  {
+    UciLoop();
+  }
 }
 
 #import "Basic";
 #import "Bit_Operations";
+#import "String";
+#if OS == .WINDOWS {
+  #import "Windows";
+} else {
+  #import "POSIX";
+}
+
+#load "uci.jai";
