@@ -140,92 +140,86 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
     enemy_field_sum |= it & ~our_color_mask;
   }
 
-  TestAddMove :: (from: Square, to: Square) -> bool #expand
+  TestAddMove :: (from: Square, to: Square, row_check: Square = -1) -> bool #expand
   {
-    result := false;
+    continue_moving := false;
     if IsValidSquare(to)
     {
-      to_field := FieldFromSquare(to);
-      if (to_field & our_field_sum) == 0
+      if row_check < 0 || IsSameRow(row_check, to)
       {
-        AddMove(from, to);
-        result = true;
+        to_field := FieldFromSquare(to);
+        if (to_field & our_field_sum) == 0
+        {
+          AddMove(from, to);
+          continue_moving = (to_field & enemy_field_sum) == 0;
+        }
       }
     }
-    return result;
+    return continue_moving;
   }
 
-  for piece_field_both_sides, piece_idx: board.fields
+  for field, piece_idx: board.fields
   {
     piece_flag := (1 << piece_idx).(PieceFlags);
-    our_piece_field := piece_field_both_sides & our_color_mask;
+    our_field := field & our_color_mask;
 
-    to_check_field := our_piece_field;
-    while to_check_field
+    our_filed_left_to_check := our_field;
+    while our_filed_left_to_check
     {
-      current_square := FirstSquareInField(to_check_field);
-      to_check_field &= ~((cast(u64)1) << current_square);
+      current := FirstSquareInField(our_filed_left_to_check);
+      our_filed_left_to_check &= ~FieldFromSquare(current);
 
-      move_up_count := 0;
+      // Calculate move counts
+      move_up := 0;
+      move_down := 0;
+      move_side := 0;
+
       if piece_flag & (.ROOK_FLAG | .QUEEN_FLAG)
       {
-        move_up_count = 8;
-      }
-      if piece_flag & (.KING_FLAG)
-      {
-        move_up_count = 1;
-      }
-      if piece_flag & (.PAWN_FLAG)
-      {
-        move_up_count = 1;
-        if IsSameRow(current_square, ROW_6) move_up_count += 1;
+        move_up = 8;
+        move_down = 8;
+        move_side = 8;
       }
 
-      // Move up
-      for 1 .. move_up_count
+      if piece_flag & .KING_FLAG
       {
-        candidate_square := (current_square - 8 * it).(Square);
-        if !TestAddMove(current_square, candidate_square) break;
+        move_up = 1;
+        move_down = 1;
+        move_side = 1;
       }
 
-      // Move down
-      if piece_flag & (.PAWN_FLAG | .ROOK_FLAG | .QUEEN_FLAG | .KING_FLAG)
+      if piece_flag & .PAWN_FLAG
       {
-        candidate_square := current_square + 8;
-        TestAddMove(current_square, candidate_square);
+        if board.black_to_move then move_down = 1 + ifx IsSameRow(current, ROW_2) then 1;
+        else                        move_up   = 1 + ifx IsSameRow(current, ROW_6) then 1;
       }
 
-      // Move left
-      if piece_flag & (.ROOK_FLAG | .QUEEN_FLAG | .KING_FLAG)
-      {
-        candidate_square := current_square - 1;
-        if IsSameRow(current_square, candidate_square)
-        {
-          TestAddMove(current_square, candidate_square);
-        }
-      }
+      // Test moves
+      for 1 .. move_up   if !TestAddMove(current, xx (current - 8*it)) break;
+      for 1 .. move_up   if !TestAddMove(current, xx (current + 8*it)) break;
+      for 1 .. move_side if !TestAddMove(current, xx (current - 1*it), current) break; // left
+      for 1 .. move_side if !TestAddMove(current, xx (current + 1*it), current) break; // right
 
-      // Move right
-      if piece_flag & (.ROOK_FLAG | .QUEEN_FLAG | .KING_FLAG)
+      // Diagonal moves
+      if piece_flag & (.BISHOP_FLAG | .QUEEN_FLAG)
       {
-        candidate_square := current_square + 1;
-        if IsSameRow(current_square, candidate_square)
-        {
-          TestAddMove(current_square, candidate_square);
-        }
+        for 1 .. 8 if !TestAddMove(current, xx (current - 9*it), current-8) break;
+        for 1 .. 8 if !TestAddMove(current, xx (current - 7*it), current-8) break;
+        for 1 .. 8 if !TestAddMove(current, xx (current + 7*it), current+8) break;
+        for 1 .. 8 if !TestAddMove(current, xx (current + 9*it), current+8) break;
       }
 
       // Knight
       if piece_flag & .KNIGHT_FLAG
       {
-        TestAddMove(current_square, current_square - 16 - 1);
-        TestAddMove(current_square, current_square - 16 + 1);
-        TestAddMove(current_square, current_square + 16 + 1);
-        TestAddMove(current_square, current_square + 16 + 1);
-        TestAddMove(current_square, current_square - 2 - 8);
-        TestAddMove(current_square, current_square - 2 + 8);
-        TestAddMove(current_square, current_square + 2 - 8);
-        TestAddMove(current_square, current_square + 2 + 8);
+        TestAddMove(current, current - 16 - 1, current-16);
+        TestAddMove(current, current - 16 + 1, current-16);
+        TestAddMove(current, current + 16 + 1, current+16);
+        TestAddMove(current, current + 16 + 1, current+16);
+        TestAddMove(current, current - 8 - 2, current-8);
+        TestAddMove(current, current - 8 + 2, current-8);
+        TestAddMove(current, current + 8 - 2, current+8);
+        TestAddMove(current, current + 8 + 2, current+8);
       }
     }
   }
@@ -268,7 +262,7 @@ main :: ()
   moves := LegalMovesFromBoard(board);
   for 0 .. moves.count-1
   {
-    print("[move %] ", it);
+    print("[move %] ", it+1);
     PrettyPrintMove(board, moves.buffer[it]);
   }
 }
