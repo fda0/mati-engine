@@ -256,15 +256,30 @@ PrettyPrintMove :: (board: Board, move: Move)
 
 main :: ()
 {
-  board := BoardFromFen(INIT_BOARD_FEN);
-  board.black_to_move = true;
+  test_init_moves: bool;
 
-  moves := LegalMovesFromBoard(board);
-  for 0 .. moves.count-1
+  args := get_command_line_arguments();
+  for args
   {
-    print("[move %] ", it+1);
-    PrettyPrintMove(board, moves.buffer[it]);
+    if it_index == 0 continue;
+
+    if it == "test" test_init_moves = true;
   }
+
+  if test_init_moves
+  {
+    board := BoardFromFen(INIT_BOARD_FEN);
+
+    moves := LegalMovesFromBoard(board);
+    for 0 .. moves.count-1
+    {
+      print("[move %] ", it+1);
+      PrettyPrintMove(board, moves.buffer[it]);
+    }
+  }
+
+  // @todo implement uci
+
 }
 
 #import "Basic";
