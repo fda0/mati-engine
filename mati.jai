@@ -178,7 +178,7 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
       if piece_flag & (.PAWN_FLAG)
       {
         move_up_count = 1;
-        if IsSameRow(current_square, ROW_2) move_up_count += 1;
+        if IsSameRow(current_square, ROW_6) move_up_count += 1;
       }
 
       // Move up
@@ -214,6 +214,19 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
           TestAddMove(current_square, candidate_square);
         }
       }
+
+      // Knight
+      if piece_flag & .KNIGHT_FLAG
+      {
+        TestAddMove(current_square, current_square - 16 - 1);
+        TestAddMove(current_square, current_square - 16 + 1);
+        TestAddMove(current_square, current_square + 16 + 1);
+        TestAddMove(current_square, current_square + 16 + 1);
+        TestAddMove(current_square, current_square - 2 - 8);
+        TestAddMove(current_square, current_square - 2 + 8);
+        TestAddMove(current_square, current_square + 2 - 8);
+        TestAddMove(current_square, current_square + 2 + 8);
+      }
     }
   }
 
@@ -225,7 +238,6 @@ PrettyPrintVec2 :: (vec: Vec2)
   char := (vec.x + #char "A").(u8);
   str := string.{data = *char, count = 1};
   print("%%", str, 8 - vec.y);
-  print(" (raw %)", vec);
 }
 
 PrettyPrintMove :: (board: Board, move: Move)
