@@ -1,3 +1,4 @@
+// Types
 Piece :: enum u8
 {
   PAWN;
@@ -57,11 +58,16 @@ MoveArray :: struct
   count: s64;
 }
 
+// Global constants
 PIECE_COUNT :: #run enum_highest_value(Piece) + 1;
 MAX_LEGAL_MOVES :: 256;
 
 INIT_BOARD_FEN :: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
+// Global variables
+rng_state: u64;
+
+// Functions
 PieceFlagsFromPiece :: (piece: Piece) -> PieceFlags { return xx (1 << piece); }
 
 SquareFromVec2 :: inline (vec: Vec2) -> Square { return xx (vec.y*8 + vec.x); }
@@ -75,19 +81,18 @@ FieldFromSquare :: inline (s: Square) -> Field
 FieldFromVec2 :: inline (vec: Vec2) -> Field { return FieldFromSquare(SquareFromVec2(vec)); }
 FirstSquareInField :: inline (field: Field) -> Square { return xx (bit_scan_forward(field) - 1); }
 
-IsUpper :: (a: u8) -> bool { return a >= #char "A" && a <= #char "Z"; }
-IsLower :: (a: u8) -> bool { return a >= #char "a" && a <= #char "z"; }
-IsDigit :: (a: u8) -> bool { return a >= #char "0" && a <= #char "9"; }
-ToLower :: (a: u8) -> u8 { return a + (ifx IsUpper(a) #char "a" - #char "A").(u8); }
 ParseDigit :: (a: u8) -> s8 { return xx (a - #char "0"); }
 
 BoardFromFen :: (text: string) -> Board
 {
   board: Board;
   pos: Vec2;
+  processed_count: s64;
   for text
   {
-    is_black := IsLower(it);
+    defer processed_count += 1;
+
+    is_black := IsAlphaLower(it);
     piece: Piece;
     if ToLower(it) == {
       case #char "p"; piece = .PAWN;
@@ -113,6 +118,10 @@ BoardFromFen :: (text: string) -> Board
 
     pos.x += 1;
   }
+
+  rest := Skip(text, processed_count);
+  if StartsWith(rest, "b") board.black_to_move = true;
+
   return board;
 }
 
@@ -294,10 +303,10 @@ PrettyPrintMove :: (board: Board, move: Move)
 
 FullRandomNumber :: () -> u64
 {
-  uci_rng_state ^= uci_rng_state << 13;
-  uci_rng_state ^= uci_rng_state >> 7;
-  uci_rng_state ^= uci_rng_state << 17;
-  return uci_rng_state;
+  rng_state ^= rng_state << 13;
+  rng_state ^= rng_state >> 7;
+  rng_state ^= rng_state << 17;
+  return rng_state;
 }
 
 RandomNumberInRange :: (max: u64) -> u64
@@ -334,6 +343,7 @@ main :: ()
   }
 }
 
+// Imports
 #import "Basic";
 #import "Bit_Operations";
 #import "String";
@@ -344,3 +354,5 @@ main :: ()
 }
 
 #load "uci.jai";
+#load "base_fixed_array.jai";
+#load "base_string.jai";

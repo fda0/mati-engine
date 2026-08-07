@@ -1,5 +1,3 @@
-uci_rng_state: u64;
-
 UciReadLine :: () -> string, bool
 {
   #if OS == .WINDOWS stdin := GetStdHandle(STD_INPUT_HANDLE);
@@ -52,45 +50,50 @@ UciMoveFromString :: (text: string) -> Move, Piece, bool
   return move, promotion, true;
 }
 
-UciStringFromMove :: (move: Move) -> string
+UciStringFromMove :: (move: Move) -> FixedArray(u8, 32)
 {
   from := Vec2FromSquare(move.from);
   to := Vec2FromSquare(move.to);
 
-  chars: [4] u8;
-  chars[0] = (from.x + #char "a").(u8);
-  chars[1] = (8 - from.y + #char "0").(u8);
-  chars[2] = (to.x + #char "a").(u8);
-  chars[3] = (8 - to.y + #char "0").(u8);
-  return copy_string(string.{count = 4, data = chars.data});
+  result: FixedArray(u8, 32);
+  add(*result, xx (from.x + #char "a"));
+  add(*result, xx (8 - from.y + #char "0"));
+  add(*result, xx (to.x + #char "a"));
+  add(*result, xx (8 - to.y + #char "0"));
+  return result;
 }
 
-UciSetPosition :: (board: *Board, parts: [] string)
+UciSetPosition :: (board: *Board, content: string)
 {
-  moves_index := parts.count;
-  for parts if it == "moves" { moves_index = it_index; break; }
-
-  if parts.count > 1 && parts[1] == "startpos"
+  if StartsWith(content, "startpos")
   {
     board.* = BoardFromFen(INIT_BOARD_FEN);
   }
-  else if parts.count > 2 && parts[1] == "fen"
+  else if StartsWith(content, "fen")
   {
-    board.* = BoardFromFen(parts[2]);
-    if min(moves_index, parts.count) > 3
-      board.black_to_move = (parts[3] == "b");
+    fen := StripWhite(Skip(content, 3));
+    board.* = BoardFromFen(fen);
   }
 
-  for moves_index + 1 .. parts.count - 1
+  moves_offset, moves_found := Find(content, "moves", .FindAddNeedleCountOnSuccess);
+  if moves_found
   {
-    move, promotion, ok := UciMoveFromString(parts[it]);
-    if ok MakeMove(board, move, promotion);
+    all_moves := StripWhite(Skip(content, moves_offset));
+    while all_moves
+    {
+      move_str := Prefix(all_moves, Find(all_moves, " "));
+      move, promotion, ok := UciMoveFromString(move_str);
+      if ok MakeMove(board, move, promotion);
+
+      all_moves = StripWhite(Skip(all_moves, move_str.count));
+    }
   }
 }
 
 UciLoop :: ()
 {
-  uci_rng_state = current_time_monotonic().low | 1;
+  uci_rng_state := current_time_monotonic().low | 1;
+  uci_rng_state = 1231;
 
   board := BoardFromFen(INIT_BOARD_FEN);
   while true
@@ -98,33 +101,41 @@ UciLoop :: ()
     line, ok := UciReadLine();
     if !ok break;
 
-    parts := split(trim(line), " ");
-    if parts.count == 0 continue;
+    line = StripWhite(line);
+    if !line continue;
 
-    if parts[0] == {
+    first := Prefix(line, Find(line, " "));
+    rest := StripWhite(Skip(line, first.count + 1));
+
+    if first == {
       case "uci";
-        print("id name mati\n");
-        print("id author Mateusz Garbowski\n");
-        print("uciok\n");
+      print("id name mati\n");
+      print("id author Mateusz Garbowski\n");
+      print("uciok\n");
+
       case "isready";
-        print("readyok\n");
+      print("readyok\n");
+
       case "ucinewgame";
-        board = BoardFromFen(INIT_BOARD_FEN);
+      board = BoardFromFen(INIT_BOARD_FEN);
+
       case "position";
-        UciSetPosition(*board, parts);
+      UciSetPosition(*board, rest);
+
       case "go";
-        moves := LegalMovesFromBoard(board);
-        if moves.count == 0
-        {
-          print("bestmove 0000\n");
-        }
-        else
-        {
-          pick := RandomNumberInRange(xx moves.count);
-          print("bestmove %\n", UciStringFromMove(moves.buffer[pick]));
-        }
+      moves := LegalMovesFromBoard(board);
+      if moves.count == 0
+      {
+        print("bestmove 0000\n");
+      }
+      else
+      {
+        pick := RandomNumberInRange(xx moves.count);
+        print("bestmove %\n", to_string(UciStringFromMove(moves.buffer[pick])));
+      }
+
       case "quit";
-        break;
+      break;
     }
   }
 }
