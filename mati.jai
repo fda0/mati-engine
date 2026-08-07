@@ -35,7 +35,7 @@ Board :: struct
   is_black: Field;
 
   halfmove_clock: u16;
-  black_to_move: u8;
+  black_to_move: bool;
   castling_rights: CastlingRights;
   en_passant_square: Square;
 }
@@ -120,7 +120,7 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
     return ((from ^ to) & (~7)) == 0;
   }
 
-  ROW_2 :: #run SquareFromVec2({0, 2});
+  ROW_1 :: #run SquareFromVec2({0, 1});
   ROW_6 :: #run SquareFromVec2({0, 6});
 
   moves: MoveArray;
@@ -190,13 +190,13 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
 
       if piece_flag & .PAWN_FLAG
       {
-        if board.black_to_move then move_down = 1 + ifx IsSameRow(current, ROW_2) then 1;
+        if board.black_to_move then move_down = 1 + ifx IsSameRow(current, ROW_1) then 1;
         else                        move_up   = 1 + ifx IsSameRow(current, ROW_6) then 1;
       }
 
       // Test moves
       for 1 .. move_up   if !TestAddMove(current, xx (current - 8*it)) break;
-      for 1 .. move_up   if !TestAddMove(current, xx (current + 8*it)) break;
+      for 1 .. move_down if !TestAddMove(current, xx (current + 8*it)) break;
       for 1 .. move_side if !TestAddMove(current, xx (current - 1*it), current) break; // left
       for 1 .. move_side if !TestAddMove(current, xx (current + 1*it), current) break; // right
 
@@ -256,8 +256,8 @@ PrettyPrintMove :: (board: Board, move: Move)
 
 main :: ()
 {
-  print("hello mati\n");
   board := BoardFromFen(INIT_BOARD_FEN);
+  board.black_to_move = true;
 
   moves := LegalMovesFromBoard(board);
   for 0 .. moves.count-1
