@@ -122,13 +122,20 @@ add :: (c: *FixedArray, $initialize := true, $truncate := false) -> *c.T, bool
 
 add_many :: (c: *FixedArray, alloc_count: s64, $initialize := true, $truncate := false) -> allocated_slice: [] c.T, bool
 {
-  was_truncated := false;
+  fully_written := true;
   space_left := c.CAPACITY - c.count;
 
-  #if truncate if alloc_count > space_left
+  #if truncate
   {
-    alloc_count = space_left;
-    was_truncated = true;
+    if alloc_count > space_left
+    {
+      alloc_count = space_left;
+      fully_written = false;
+    }
+  }
+  else
+  {
+    assert(alloc_count <= space_left);
   }
 
   if alloc_count <= 0 then return .[], false;
@@ -149,17 +156,17 @@ add_many :: (c: *FixedArray, alloc_count: s64, $initialize := true, $truncate :=
     }
     else
     {
-      memset(res.data, 0, array_size_bytes(res));
+      memset(res.data, 0, res.count * size_of(c.T));
     }
   }
 
   c.count += alloc_count;
-  return res, !was_truncated;
+  return res, fully_written;
 }
 
 push_bytes :: (c: *FixedArray(u8, $CAP), data: *void, size: s64, $truncate := false) -> bool
 {
-  slice, was_truncated := add_many(c, size, initialize=false, truncate=truncate);
+  slice, fully_written := add_many(c, size, initialize=false, truncate=truncate);
   memcpy(slice.data, data, slice.count);
-  return was_truncated;
+  return fully_written;
 }

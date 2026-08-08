@@ -81,7 +81,7 @@ UciSetPosition :: (board: *Board, content: string)
     all_moves := StripWhite(Skip(content, moves_offset));
     while all_moves
     {
-      move_str := Prefix(all_moves, Find(all_moves, " "));
+      move_str := Prefix(all_moves, Find(all_moves, " ", .FindAddHaystackCountOnFail));
       move, promotion := UciMoveFromString(move_str);
       MakeMove(board, move, promotion);
 
@@ -92,8 +92,7 @@ UciSetPosition :: (board: *Board, content: string)
 
 UciLoop :: ()
 {
-  uci_rng_state := current_time_monotonic().low | 1;
-  uci_rng_state = 1231;
+  rng_state = current_time_monotonic().low | 1;
 
   board := BoardFromFen(INIT_BOARD_FEN);
   while true
@@ -104,12 +103,12 @@ UciLoop :: ()
     line = StripWhite(line);
     if !line continue;
 
-    first := Prefix(line, Find(line, " "));
-    rest := StripWhite(Skip(line, first.count + 1));
+    first := Prefix(line, Find(line, " ", .FindAddHaystackCountOnFail));
+    second := StripWhite(Skip(line, first.count + 1));
 
     if first == {
       case "uci";
-      print("id name mati\n");
+      print("id name Mati-Engine\n");
       print("id author Mateusz Garbowski\n");
       print("uciok\n");
 
@@ -120,7 +119,7 @@ UciLoop :: ()
       board = BoardFromFen(INIT_BOARD_FEN);
 
       case "position";
-      UciSetPosition(*board, rest);
+      UciSetPosition(*board, second);
 
       case "go";
       moves := LegalMovesFromBoard(board);

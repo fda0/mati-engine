@@ -227,7 +227,7 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
         TestAddMove(current, current - 16 - 1, current-16);
         TestAddMove(current, current - 16 + 1, current-16);
         TestAddMove(current, current + 16 + 1, current+16);
-        TestAddMove(current, current + 16 + 1, current+16);
+        TestAddMove(current, current + 16 - 1, current+16);
         TestAddMove(current, current - 8 - 2, current-8);
         TestAddMove(current, current - 8 + 2, current-8);
         TestAddMove(current, current + 8 - 2, current+8);
@@ -244,15 +244,19 @@ MakeMove :: (board: *Board, move: Move, promotion := Piece.PAWN)
   from_field := FieldFromSquare(move.from);
   to_field := FieldFromSquare(move.to);
 
-  moving_piece: PieceFlags;
+  moving_piece_index := -1;
   for * board.fields
   {
-    if it.* & from_field then moving_piece |= PieceFlagsFromPiece(xx it_index);
+    if it.* & from_field
+    {
+      assert(moving_piece_index < 0); // multiple pieces on move.from
+      moving_piece_index = it_index;
+    }
     it.* &= ~to_field; // remove any captured piece
   }
-  assert(popcount(moving_piece) == 1);
+  assert(moving_piece_index >= 0); // no piece on move.from
 
-  board.fields[moving_piece] &= ~from_field;
+  board.fields[moving_piece_index] &= ~from_field;
 
   promotion_flag := PieceFlagsFromPiece(promotion);
   if promotion_flag & (.KNIGHT_FLAG | .BISHOP_FLAG | .ROOK_FLAG | .QUEEN_FLAG)
@@ -261,7 +265,7 @@ MakeMove :: (board: *Board, move: Move, promotion := Piece.PAWN)
   }
   else
   {
-    board.fields[moving_piece] |= to_field;
+    board.fields[moving_piece_index] |= to_field;
   }
 
   board.is_black &= ~to_field;

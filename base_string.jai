@@ -170,7 +170,7 @@ Find :: (haystack: string, needle: string, flags: MatchFlags = 0) -> s64, bool
 
   if flags & .FindLast
   {
-    i := haystack.count - 1;
+    i := haystack.count - needle.count;
     while i >= 0
     {
       h := Skip(haystack, i);
@@ -186,7 +186,7 @@ Find :: (haystack: string, needle: string, flags: MatchFlags = 0) -> s64, bool
   else
   {
     i := 0;
-    while haystack.count > i
+    while i + needle.count <= haystack.count
     {
       h := Skip(haystack, i);
       found = Match(h, needle, flags);
