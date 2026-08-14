@@ -23,10 +23,9 @@ UciReadLine :: () -> string, bool
   return builder_to_string(*builder), true;
 }
 
-UciMoveFromString :: (text: string) -> Move, Piece
+UciMoveFromString :: (text: string) -> Move
 {
   move: Move;
-  promotion: Piece;
   assert(text.count >= 4);
 
   fx := text[0] - #char "a";
@@ -41,13 +40,13 @@ UciMoveFromString :: (text: string) -> Move, Piece
   if text.count >= 5
   {
     if text[4] == {
-      case #char "n"; promotion = .KNIGHT;
-      case #char "b"; promotion = .BISHOP;
-      case #char "r"; promotion = .ROOK;
-      case #char "q"; promotion = .QUEEN;
+      case #char "n"; move.promotion = .KNIGHT;
+      case #char "b"; move.promotion = .BISHOP;
+      case #char "r"; move.promotion = .ROOK;
+      case #char "q"; move.promotion = .QUEEN;
     }
   }
-  return move, promotion;
+  return move;
 }
 
 UciStringFromMove :: (move: Move) -> FixedArray(u8, 32)
@@ -82,8 +81,8 @@ UciSetPosition :: (board: *Board, content: string)
     while all_moves
     {
       move_str := Prefix(all_moves, Find(all_moves, " ", .FindAddHaystackCountOnFail));
-      move, promotion := UciMoveFromString(move_str);
-      MakeMove(board, move, promotion);
+      move  := UciMoveFromString(move_str);
+      ApplyMoveToBoard(board, move);
 
       all_moves = StripWhite(Skip(all_moves, move_str.count));
     }
@@ -123,7 +122,7 @@ UciLoop :: ()
       UciSetPosition(*board, second);
 
       case "go";
-      moves := LegalMovesFromBoard(board);
+      moves := MovesFromBoard(board);
       if moves.count == 0
       {
         print("bestmove 0000\n");

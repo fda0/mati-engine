@@ -125,7 +125,7 @@ BoardFromFen :: (text: string) -> Board
   return board;
 }
 
-LegalMovesFromBoard :: (board: Board) -> MoveArray
+MovesFromBoard :: (board: Board) -> MoveArray
 {
   IsSameRow :: inline (from: Square, to: Square) -> bool
   {
@@ -236,7 +236,7 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
   return moves;
 }
 
-MakeMove :: (board: *Board, move: Move, promotion := Piece.PAWN)
+ApplyMoveToBoard :: (board: *Board, move: Move, promotion := Piece.PAWN)
 {
   from_field := FieldFromSquare(move.from);
   to_field := FieldFromSquare(move.to);
@@ -331,7 +331,7 @@ main :: ()
   {
     board := BoardFromFen(INIT_BOARD_FEN);
 
-    moves := LegalMovesFromBoard(board);
+    moves := MovesFromBoard(board);
     for 0 .. moves.count-1
     {
       print("[move %] ", it+1);
