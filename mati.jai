@@ -162,7 +162,7 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
     return continue_moving;
   }
 
-  AddMove :: (from: Square, to: Square, row_check: Square = -1) -> bool #expand
+  AddMove :: (from: Square, to: Square, row_check: Square = INVALID_SQUARE) -> bool #expand
   {
     return AddMoveNotInField(from, to, our_field_sum, row_check);
   }
@@ -244,7 +244,7 @@ RemoveIllegalMoves :: (init_board: Board, moves: *MoveArray)
   for * moves.*
   {
     board := init_board;
-    print("In RemoveIllegalMoves Loop 1, move: "); PrettyPrintMove(board, it);
+    print("[%] In RemoveIllegalMoves Loop 1, move: ", it_index); PrettyPrintMove(board, it);
     ApplyMoveToBoard(*board, it);
 
     king_count := popcount(board.fields[Piece.KING]);
@@ -254,7 +254,7 @@ RemoveIllegalMoves :: (init_board: Board, moves: *MoveArray)
     moves2 := AllMovesFromBoard(board);
     for moves2
     {
-      print("  In RemoveIllegalMoves Loop 2, move: "); PrettyPrintMove(board, it);
+      print("  [%] In RemoveIllegalMoves Loop 2, move: ", it_index); PrettyPrintMove(board, it);
 
       board2 := board;
       ApplyMoveToBoard(*board2, it);
@@ -369,14 +369,14 @@ main :: ()
   if test_init_moves
   {
     AVOID_CHECK_FEN :: "2rkr3/8/8/8/8/8/8/3K4 w - - 0 1";
-    TEST_FEN :: "1r1k2N1/p5br/1p3P2/Pn1P2Pp/P5P1/1QB4N/5P1R/R3KB2 b - - 2 34";
+    TEST_FEN :: "1r1k2r1/3b4/pp6/bPp1ppp1/2P1PPPp/7P/5K2/3R3R b - - 4 43";
     // board := BoardFromFen(INIT_BOARD_FEN);
     board := BoardFromFen(TEST_FEN);
 
     moves := LegalMovesFromBoard(board);
     for moves
     {
-      print("[move %] ", it_index + 1);
+      print("[move %] ", it_index);
       PrettyPrintMove(board, it);
     }
   }
