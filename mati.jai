@@ -192,13 +192,13 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
         }
 
         // Diagonal moves (captures)
-        AddMoveNotInField(current, xx (current + 8*direction - 1), ~enemy_field_sum, xx (8*direction));
-        AddMoveNotInField(current, xx (current + 8*direction + 1), ~enemy_field_sum, xx (8*direction));
+        AddMoveNotInField(current, xx (current + 8*direction - 1), ~enemy_field_sum, xx (current + 8*direction));
+        AddMoveNotInField(current, xx (current + 8*direction + 1), ~enemy_field_sum, xx (current + 8*direction));
       }
 
       // Side moves (ROOK, QUEEN, KING)
       move_side := 0;
-      if piece_flag & (.ROOK_FLAG | .QUEEN_FLAG) then move_side = 8;
+      if piece_flag & (.ROOK_FLAG | .QUEEN_FLAG) then move_side = 7;
       if piece_flag & .KING_FLAG then move_side = 1;
       for 1 .. move_side if !AddMove(current, xx (current - 8*it)) break; // up
       for 1 .. move_side if !AddMove(current, xx (current + 8*it)) break; // down
@@ -207,7 +207,7 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
 
       // Diagonal moves (.BISHOP, QUEEN, KING)
       diagonal_moves := 0;
-      if piece_flag & (.BISHOP_FLAG | .QUEEN_FLAG) then diagonal_moves = 8;
+      if piece_flag & (.BISHOP_FLAG | .QUEEN_FLAG) then diagonal_moves = 7;
       if piece_flag & (.KING_FLAG) then diagonal_moves = 1;
       for 1 .. diagonal_moves if !AddMove(current, xx (current - 9*it), xx(current - 8*it)) break;
       for 1 .. diagonal_moves if !AddMove(current, xx (current - 7*it), xx(current - 8*it)) break;
@@ -369,7 +369,7 @@ main :: ()
   if test_init_moves
   {
     AVOID_CHECK_FEN :: "2rkr3/8/8/8/8/8/8/3K4 w - - 0 1";
-    TEST_FEN :: "1r1k2r1/3b4/pp6/bPp1ppp1/2P1PPPp/7P/5K2/3R3R b - - 4 43";
+    TEST_FEN :: "r2q4/1b1p3N/1P4p1/1KpPP2p/1nP5/7k/1b6/1N6 w - - 3 67";
     // board := BoardFromFen(INIT_BOARD_FEN);
     board := BoardFromFen(TEST_FEN);
 
