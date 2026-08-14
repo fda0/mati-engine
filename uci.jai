@@ -59,6 +59,12 @@ UciStringFromMove :: (move: Move) -> FixedArray(u8, 32)
   add(*result, xx (8 - from.y + #char "0"));
   add(*result, xx (to.x + #char "a"));
   add(*result, xx (8 - to.y + #char "0"));
+  if move.promotion == {
+    case .KNIGHT; add(*result, #char "n");
+    case .BISHOP; add(*result, #char "b");
+    case .ROOK; add(*result, #char "r");
+    case .QUEEN; add(*result, #char "q");
+  }
   return result;
 }
 
