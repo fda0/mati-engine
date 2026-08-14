@@ -52,15 +52,10 @@ Move :: struct
   to: Square;
   promotion: Piece;
 }
-MoveArray :: struct
-{
-  buffer: [MAX_LEGAL_MOVES] Move;
-  count: s64;
-}
+MoveArray :: FixedArray(Move, 256);
 
 // Global constants
 PIECE_COUNT :: #run enum_highest_value(Piece) + 1;
-MAX_LEGAL_MOVES :: 256;
 
 INIT_BOARD_FEN :: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -125,7 +120,7 @@ BoardFromFen :: (text: string) -> Board
   return board;
 }
 
-MovesFromBoard :: (board: Board) -> MoveArray
+AllMovesFromBoard :: (board: Board) -> MoveArray
 {
   IsSameRow :: inline (from: Square, to: Square) -> bool
   {
@@ -158,8 +153,7 @@ MovesFromBoard :: (board: Board) -> MoveArray
         to_field := FieldFromSquare(to);
         if (to_field & exclude_field) == 0
         {
-          moves.buffer[moves.count] = {from, to, promotion};
-          moves.count += 1;
+          add(*moves, {from, to, promotion});
           continue_moving = (to_field & enemy_field_sum) == 0;
         }
       }
@@ -236,7 +230,25 @@ MovesFromBoard :: (board: Board) -> MoveArray
   return moves;
 }
 
-ApplyMoveToBoard :: (board: *Board, move: Move, promotion := Piece.PAWN)
+LegalMovesFromBoard :: (board: Board) -> MoveArray
+{
+  moves := AllMovesFromBoard(board);
+  RemoveIllegalMoves(board, *moves);
+  return moves;
+}
+
+RemoveIllegalMoves :: (init_board: Board, moves: *MoveArray)
+{
+  for * moves.*
+  {
+    board := init_board;
+    ApplyMoveToBoard(*board, it);
+    king_count := popcount(board.fields[Piece.KING]);
+    if king_count < 1 then remove it;
+  }
+}
+
+ApplyMoveToBoard :: (board: *Board, move: Move)
 {
   from_field := FieldFromSquare(move.from);
   to_field := FieldFromSquare(move.to);
@@ -255,10 +267,10 @@ ApplyMoveToBoard :: (board: *Board, move: Move, promotion := Piece.PAWN)
 
   board.fields[moving_piece_index] &= ~from_field;
 
-  promotion_flag := PieceFlagsFromPiece(promotion);
+  promotion_flag := PieceFlagsFromPiece(move.promotion);
   if promotion_flag & (.KNIGHT_FLAG | .BISHOP_FLAG | .ROOK_FLAG | .QUEEN_FLAG)
   {
-    board.fields[promotion] |= to_field;
+    board.fields[move.promotion] |= to_field;
   }
   else
   {
@@ -317,6 +329,9 @@ RandomNumberInRange :: (max: u64) -> u64
 
 main :: ()
 {
+  rng_state = current_time_monotonic().low | 1;
+  rng_state = 1129873231; // init rng state for debugging
+
   test_init_moves: bool;
 
   args := get_command_line_arguments();
@@ -331,11 +346,11 @@ main :: ()
   {
     board := BoardFromFen(INIT_BOARD_FEN);
 
-    moves := MovesFromBoard(board);
-    for 0 .. moves.count-1
+    moves := LegalMovesFromBoard(board);
+    for moves
     {
-      print("[move %] ", it+1);
-      PrettyPrintMove(board, moves.buffer[it]);
+      print("[move %] ", it_index + 1);
+      PrettyPrintMove(board, it);
     }
   }
   else

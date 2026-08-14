@@ -91,9 +91,6 @@ UciSetPosition :: (board: *Board, content: string)
 
 UciLoop :: ()
 {
-  rng_state = current_time_monotonic().low | 1;
-  // rng_state = 1129873231; // init rng state for debugging
-
   board := BoardFromFen(INIT_BOARD_FEN);
   while true
   {
@@ -122,7 +119,7 @@ UciLoop :: ()
       UciSetPosition(*board, second);
 
       case "go";
-      moves := MovesFromBoard(board);
+      moves := LegalMovesFromBoard(board);
       if moves.count == 0
       {
         print("bestmove 0000\n");
@@ -130,7 +127,7 @@ UciLoop :: ()
       else
       {
         pick := RandomNumberInRange(xx moves.count);
-        print("bestmove %\n", to_string(UciStringFromMove(moves.buffer[pick])));
+        print("bestmove %\n", to_string(UciStringFromMove(moves[pick])));
       }
 
       case "quit";

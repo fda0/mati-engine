@@ -17,15 +17,15 @@ to_string :: (c: FixedArray(u8, $CAP)) -> string
   return string.{data = c.buf.data, count = c.count};
 }
 
-operator [] :: (c: FixedArray, i: s64) -> c.T
+operator [] :: (c: FixedArray, i: $INT) -> c.T
 {
-  assert(i < c.count);
+  assert(xx i < c.count);
   return c.buf[i];
 }
 
-operator []= :: inline (c: *FixedArray, i: int, value: c.T)
+operator []= :: inline (c: *FixedArray, i: $INT, value: c.T)
 {
-  assert(i < c.count);
+  assert(xx i < c.count);
   c.buf[i] = value;
 }
 
