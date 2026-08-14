@@ -128,8 +128,10 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
     return ((from ^ to) & (~7)) == 0;
   }
 
+  ROW_0 :: #run SquareFromVec2({0, 0});
   ROW_1 :: #run SquareFromVec2({0, 1});
   ROW_6 :: #run SquareFromVec2({0, 6});
+  ROW_7 :: #run SquareFromVec2({0, 7});
 
   moves: MoveArray;
   our_color_mask := ifx board.black_to_move then board.is_black else ~board.is_black;
@@ -143,7 +145,8 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
   }
   both_teams_field_sum := our_field_sum | enemy_field_sum;
 
-  AddMoveNotInField :: (from: Square, to: Square, exclude_field: Field, row_check: Square = INVALID_SQUARE) -> bool #expand
+  AddMoveNotInField :: (from: Square, to: Square, exclude_field: Field,
+                        row_check: Square = INVALID_SQUARE, is_pawn := false) -> bool #expand
   {
     promotion := Piece.PAWN;
     continue_moving := false;
@@ -154,7 +157,13 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
         to_field := FieldFromSquare(to);
         if (to_field & exclude_field) == 0
         {
-          add(*moves, {from, to, promotion});
+          promotions: [] Piece = .[.PAWN];
+          if is_pawn && (IsSameRow(to, ROW_0) || IsSameRow(to, ROW_7))
+          {
+            promotions = .[.KNIGHT, .BISHOP, .ROOK, .QUEEN];
+          }
+
+          for promotions add(*moves, {from, to, it});
           continue_moving = (to_field & enemy_field_sum) == 0;
         }
       }
@@ -188,12 +197,12 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
         // Forward moves (no captures)
         for 1 .. move_count
         {
-          if !AddMoveNotInField(current, xx (current + 8*it*direction), both_teams_field_sum) break;
+          if !AddMoveNotInField(current, xx (current + 8*it*direction), both_teams_field_sum, is_pawn = true) break;
         }
 
         // Diagonal moves (captures)
-        AddMoveNotInField(current, xx (current + 8*direction - 1), ~enemy_field_sum, xx (current + 8*direction));
-        AddMoveNotInField(current, xx (current + 8*direction + 1), ~enemy_field_sum, xx (current + 8*direction));
+        AddMoveNotInField(current, xx (current + 8*direction - 1), ~enemy_field_sum, xx (current + 8*direction), is_pawn = true);
+        AddMoveNotInField(current, xx (current + 8*direction + 1), ~enemy_field_sum, xx (current + 8*direction), is_pawn = true);
       }
 
       // Side moves (ROOK, QUEEN, KING)
@@ -369,7 +378,7 @@ main :: ()
   if test_init_moves
   {
     AVOID_CHECK_FEN :: "2rkr3/8/8/8/8/8/8/3K4 w - - 0 1";
-    TEST_FEN :: "r2q4/1b1p3N/1P4p1/1KpPP2p/1nP5/7k/1b6/1N6 w - - 3 67";
+    TEST_FEN :: "2b1n1k1/nr6/8/N1pp3R/3B1pB1/1p4p1/5p2/3K4 b - - 5 62";
     // board := BoardFromFen(INIT_BOARD_FEN);
     board := BoardFromFen(TEST_FEN);
 
