@@ -93,6 +93,7 @@ UciSetPosition :: (board: *Board, content: string)
 UciLoop :: ()
 {
   rng_state = current_time_monotonic().low | 1;
+  // rng_state = 1129873231; // init rng state for debugging
 
   board := BoardFromFen(INIT_BOARD_FEN);
   while true

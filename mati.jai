@@ -136,12 +136,6 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
   ROW_6 :: #run SquareFromVec2({0, 6});
 
   moves: MoveArray;
-  AddMove :: (from: Square, to: Square, promotion := Piece.PAWN) #expand
-  {
-    moves.buffer[moves.count] = {from, to, promotion};
-    moves.count += 1;
-  }
-
   our_color_mask := ifx board.black_to_move then board.is_black else ~board.is_black;
 
   our_field_sum: Field;
@@ -151,23 +145,31 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
     our_field_sum |= it & our_color_mask;
     enemy_field_sum |= it & ~our_color_mask;
   }
+  both_teams_field_sum := our_field_sum | enemy_field_sum;
 
-  TestAddMove :: (from: Square, to: Square, row_check: Square = -1) -> bool #expand
+  AddMoveNotInField :: (from: Square, to: Square, exclude_field: Field, row_check: Square = -1) -> bool #expand
   {
+    promotion := Piece.PAWN;
     continue_moving := false;
     if IsValidSquare(to)
     {
       if row_check < 0 || IsSameRow(row_check, to)
       {
         to_field := FieldFromSquare(to);
-        if (to_field & our_field_sum) == 0
+        if (to_field & exclude_field) == 0
         {
-          AddMove(from, to);
+          moves.buffer[moves.count] = {from, to, promotion};
+          moves.count += 1;
           continue_moving = (to_field & enemy_field_sum) == 0;
         }
       }
     }
     return continue_moving;
+  }
+
+  AddMove :: (from: Square, to: Square, row_check: Square = -1) -> bool #expand
+  {
+    AddMoveNotInField(from, to, our_field_sum, row_check);
   }
 
   for field, piece_idx: board.fields
@@ -181,57 +183,52 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
       current := FirstSquareInField(our_filed_left_to_check);
       our_filed_left_to_check &= ~FieldFromSquare(current);
 
-      // Calculate move counts
-      move_up := 0;
-      move_down := 0;
+      // ROOK, QUEEN, KING moves
       move_side := 0;
-
-      if piece_flag & (.ROOK_FLAG | .QUEEN_FLAG)
-      {
-        move_up = 8;
-        move_down = 8;
-        move_side = 8;
-      }
-
-      if piece_flag & .KING_FLAG
-      {
-        move_up = 1;
-        move_down = 1;
-        move_side = 1;
-      }
+      if piece_flag & (.ROOK_FLAG | .QUEEN_FLAG) then move_side = 8;
+      if piece_flag & .KING_FLAG then move_side = 1;
+      for 1 .. move_side if !AddMove(current, xx (current - 8*it)) break; // up
+      for 1 .. move_side if !AddMove(current, xx (current + 8*it)) break; // down
+      for 1 .. move_side if !AddMove(current, xx (current - 1*it), current) break; // left
+      for 1 .. move_side if !AddMove(current, xx (current + 1*it), current) break; // right
 
       if piece_flag & .PAWN_FLAG
       {
-        if board.black_to_move then move_down = 1 + ifx IsSameRow(current, ROW_1) then 1;
-        else                        move_up   = 1 + ifx IsSameRow(current, ROW_6) then 1;
-      }
+        direction := ifx board.black_to_move then 1 else -1;
+        bonus_row := ifx board.black_to_move then ROW_1 else ROW_6;
+        move_count := 1 + ifx IsSameRow(current, bonus_row) then 1;
 
-      // Test moves
-      for 1 .. move_up   if !TestAddMove(current, xx (current - 8*it)) break;
-      for 1 .. move_down if !TestAddMove(current, xx (current + 8*it)) break;
-      for 1 .. move_side if !TestAddMove(current, xx (current - 1*it), current) break; // left
-      for 1 .. move_side if !TestAddMove(current, xx (current + 1*it), current) break; // right
+        // Forward moves (no captures)
+        for 1 .. move_count
+        {
+          if !AddMoveNotInField(current, xx (current + 8*it*direction), both_teams_field_sum) break;
+        }
+
+        // Diagonal moves (captures)
+        AddMoveNotInField(current, xx (current + 8*direction - 1), ~enemy_field_sum, xx (8*direction));
+        AddMoveNotInField(current, xx (current + 8*direction + 1), ~enemy_field_sum, xx (8*direction));
+      }
 
       // Diagonal moves
       if piece_flag & (.BISHOP_FLAG | .QUEEN_FLAG)
       {
-        for 1 .. 8 if !TestAddMove(current, xx (current - 9*it), current-8) break;
-        for 1 .. 8 if !TestAddMove(current, xx (current - 7*it), current-8) break;
-        for 1 .. 8 if !TestAddMove(current, xx (current + 7*it), current+8) break;
-        for 1 .. 8 if !TestAddMove(current, xx (current + 9*it), current+8) break;
+        for 1 .. 8 if !AddMove(current, xx (current - 9*it), current-8) break;
+        for 1 .. 8 if !AddMove(current, xx (current - 7*it), current-8) break;
+        for 1 .. 8 if !AddMove(current, xx (current + 7*it), current+8) break;
+        for 1 .. 8 if !AddMove(current, xx (current + 9*it), current+8) break;
       }
 
       // Knight
       if piece_flag & .KNIGHT_FLAG
       {
-        TestAddMove(current, current - 16 - 1, current-16);
-        TestAddMove(current, current - 16 + 1, current-16);
-        TestAddMove(current, current + 16 + 1, current+16);
-        TestAddMove(current, current + 16 - 1, current+16);
-        TestAddMove(current, current - 8 - 2, current-8);
-        TestAddMove(current, current - 8 + 2, current-8);
-        TestAddMove(current, current + 8 - 2, current+8);
-        TestAddMove(current, current + 8 + 2, current+8);
+        AddMove(current, current - 16 - 1, current-16);
+        AddMove(current, current - 16 + 1, current-16);
+        AddMove(current, current + 16 + 1, current+16);
+        AddMove(current, current + 16 - 1, current+16);
+        AddMove(current, current - 8 - 2, current-8);
+        AddMove(current, current - 8 + 2, current-8);
+        AddMove(current, current + 8 - 2, current+8);
+        AddMove(current, current + 8 + 2, current+8);
       }
     }
   }
