@@ -56,6 +56,7 @@ MoveArray :: FixedArray(Move, 256);
 
 // Global constants
 PIECE_COUNT :: #run enum_highest_value(Piece) + 1;
+INVALID_SQUARE: Square : -128;
 
 INIT_BOARD_FEN :: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -142,13 +143,13 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
   }
   both_teams_field_sum := our_field_sum | enemy_field_sum;
 
-  AddMoveNotInField :: (from: Square, to: Square, exclude_field: Field, row_check: Square = -1) -> bool #expand
+  AddMoveNotInField :: (from: Square, to: Square, exclude_field: Field, row_check: Square = INVALID_SQUARE) -> bool #expand
   {
     promotion := Piece.PAWN;
     continue_moving := false;
     if IsValidSquare(to)
     {
-      if row_check < 0 || IsSameRow(row_check, to)
+      if row_check == INVALID_SQUARE || IsSameRow(row_check, to)
       {
         to_field := FieldFromSquare(to);
         if (to_field & exclude_field) == 0
@@ -181,8 +182,8 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
       if piece_flag & .PAWN_FLAG
       {
         direction := ifx board.black_to_move then 1 else -1;
-        bonus_row := ifx board.black_to_move then ROW_1 else ROW_6;
-        move_count := 1 + ifx IsSameRow(current, bonus_row) then 1;
+        pawn_starting_row := ifx board.black_to_move then ROW_1 else ROW_6;
+        move_count := 1 + ifx IsSameRow(current, pawn_starting_row) then 1;
 
         // Forward moves (no captures)
         for 1 .. move_count
@@ -208,10 +209,10 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
       diagonal_moves := 0;
       if piece_flag & (.BISHOP_FLAG | .QUEEN_FLAG) then diagonal_moves = 8;
       if piece_flag & (.KING_FLAG) then diagonal_moves = 1;
-      for 1 .. diagonal_moves if !AddMove(current, xx (current - 9*it), current-8) break;
-      for 1 .. diagonal_moves if !AddMove(current, xx (current - 7*it), current-8) break;
-      for 1 .. diagonal_moves if !AddMove(current, xx (current + 7*it), current+8) break;
-      for 1 .. diagonal_moves if !AddMove(current, xx (current + 9*it), current+8) break;
+      for 1 .. diagonal_moves if !AddMove(current, xx (current - 9*it), xx(current - 8*it)) break;
+      for 1 .. diagonal_moves if !AddMove(current, xx (current - 7*it), xx(current - 8*it)) break;
+      for 1 .. diagonal_moves if !AddMove(current, xx (current + 7*it), xx(current + 8*it)) break;
+      for 1 .. diagonal_moves if !AddMove(current, xx (current + 9*it), xx(current + 8*it)) break;
 
       // Knight
       if piece_flag & .KNIGHT_FLAG
@@ -368,8 +369,9 @@ main :: ()
   if test_init_moves
   {
     AVOID_CHECK_FEN :: "2rkr3/8/8/8/8/8/8/3K4 w - - 0 1";
+    TEST_FEN :: "1r1k2N1/p5br/1p3P2/Pn1P2Pp/P5P1/1QB4N/5P1R/R3KB2 b - - 2 34";
     // board := BoardFromFen(INIT_BOARD_FEN);
-    board := BoardFromFen(AVOID_CHECK_FEN);
+    board := BoardFromFen(TEST_FEN);
 
     moves := LegalMovesFromBoard(board);
     for moves
