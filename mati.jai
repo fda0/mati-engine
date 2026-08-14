@@ -163,7 +163,7 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
 
   AddMove :: (from: Square, to: Square, row_check: Square = -1) -> bool #expand
   {
-    AddMoveNotInField(from, to, our_field_sum, row_check);
+    return AddMoveNotInField(from, to, our_field_sum, row_check);
   }
 
   for field, piece_idx: board.fields
@@ -177,15 +177,7 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
       current := FirstSquareInField(our_filed_left_to_check);
       our_filed_left_to_check &= ~FieldFromSquare(current);
 
-      // ROOK, QUEEN, KING moves
-      move_side := 0;
-      if piece_flag & (.ROOK_FLAG | .QUEEN_FLAG) then move_side = 8;
-      if piece_flag & .KING_FLAG then move_side = 1;
-      for 1 .. move_side if !AddMove(current, xx (current - 8*it)) break; // up
-      for 1 .. move_side if !AddMove(current, xx (current + 8*it)) break; // down
-      for 1 .. move_side if !AddMove(current, xx (current - 1*it), current) break; // left
-      for 1 .. move_side if !AddMove(current, xx (current + 1*it), current) break; // right
-
+      // PAWN moves
       if piece_flag & .PAWN_FLAG
       {
         direction := ifx board.black_to_move then 1 else -1;
@@ -203,14 +195,23 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
         AddMoveNotInField(current, xx (current + 8*direction + 1), ~enemy_field_sum, xx (8*direction));
       }
 
-      // Diagonal moves
-      if piece_flag & (.BISHOP_FLAG | .QUEEN_FLAG)
-      {
-        for 1 .. 8 if !AddMove(current, xx (current - 9*it), current-8) break;
-        for 1 .. 8 if !AddMove(current, xx (current - 7*it), current-8) break;
-        for 1 .. 8 if !AddMove(current, xx (current + 7*it), current+8) break;
-        for 1 .. 8 if !AddMove(current, xx (current + 9*it), current+8) break;
-      }
+      // Side moves (ROOK, QUEEN, KING)
+      move_side := 0;
+      if piece_flag & (.ROOK_FLAG | .QUEEN_FLAG) then move_side = 8;
+      if piece_flag & .KING_FLAG then move_side = 1;
+      for 1 .. move_side if !AddMove(current, xx (current - 8*it)) break; // up
+      for 1 .. move_side if !AddMove(current, xx (current + 8*it)) break; // down
+      for 1 .. move_side if !AddMove(current, xx (current - 1*it), current) break; // left
+      for 1 .. move_side if !AddMove(current, xx (current + 1*it), current) break; // right
+
+      // Diagonal moves (.BISHOP, QUEEN, KING)
+      diagonal_moves := 0;
+      if piece_flag & (.BISHOP_FLAG | .QUEEN_FLAG) then diagonal_moves = 8;
+      if piece_flag & (.KING_FLAG) then diagonal_moves = 1;
+      for 1 .. diagonal_moves if !AddMove(current, xx (current - 9*it), current-8) break;
+      for 1 .. diagonal_moves if !AddMove(current, xx (current - 7*it), current-8) break;
+      for 1 .. diagonal_moves if !AddMove(current, xx (current + 7*it), current+8) break;
+      for 1 .. diagonal_moves if !AddMove(current, xx (current + 9*it), current+8) break;
 
       // Knight
       if piece_flag & .KNIGHT_FLAG
@@ -233,7 +234,7 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
 LegalMovesFromBoard :: (board: Board) -> MoveArray
 {
   moves := AllMovesFromBoard(board);
-  RemoveIllegalMoves(board, *moves);
+  RemoveIllegalMoves(board, *moves); // @todo LOOK ONE MOVE AHEAD!!!
   return moves;
 }
 
@@ -242,9 +243,31 @@ RemoveIllegalMoves :: (init_board: Board, moves: *MoveArray)
   for * moves.*
   {
     board := init_board;
+    print("In RemoveIllegalMoves Loop 1, move: "); PrettyPrintMove(board, it);
     ApplyMoveToBoard(*board, it);
+
     king_count := popcount(board.fields[Piece.KING]);
-    if king_count < 1 then remove it;
+    assert(king_count == 2);
+
+
+    moves2 := AllMovesFromBoard(board);
+    for moves2
+    {
+      print("  In RemoveIllegalMoves Loop 2, move: "); PrettyPrintMove(board, it);
+
+      board2 := board;
+      ApplyMoveToBoard(*board2, it);
+      king_count = popcount(board2.fields[Piece.KING]);
+
+      if king_count < 2
+      {
+        log("    !!!  king count: %", king_count);
+        break;
+      }
+    }
+
+    // if king_count == 1 then it's a pat? IDK? it's legal i guess?
+    if king_count < 2 then remove it;
   }
 }
 
@@ -344,7 +367,9 @@ main :: ()
 
   if test_init_moves
   {
-    board := BoardFromFen(INIT_BOARD_FEN);
+    AVOID_CHECK_FEN :: "2rkr3/8/8/8/8/8/8/3K4 w - - 0 1";
+    // board := BoardFromFen(INIT_BOARD_FEN);
+    board := BoardFromFen(AVOID_CHECK_FEN);
 
     moves := LegalMovesFromBoard(board);
     for moves
