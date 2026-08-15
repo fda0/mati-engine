@@ -12,8 +12,8 @@ OneMoveFENTests :: ()
   {
     board := BoardFromFen("k7/8/8/5pP1/8/8/8/1K6 w - f6 0 40");
     moves := LegalMovesFromBoard(board);
-    moves_str := MoveArrayToString(moves, {board=board, piece=true});
-    log("en_passant board: %, moves:\n%", board, moves_str);
+    moves_str := MoveArrayToString(moves, {board=board, piece=true, sort = true});
+    print("%", moves_str);
     assert(Contains(moves_str, "White PAWN g5f6"));
   }
 

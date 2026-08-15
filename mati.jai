@@ -272,27 +272,18 @@ RemoveIllegalMoves :: (init_board: Board, moves: *MoveArray)
   for * moves.*
   {
     board := init_board;
-    print("[%] In RemoveIllegalMoves Loop 1, move: ", it_index); PrettyPrintMove(board, it);
     ApplyMoveToBoard(*board, it);
 
     king_count := popcount(board.fields[Piece.KING]);
     assert(king_count == 2);
 
-
     moves2 := AllMovesFromBoard(board);
     for moves2
     {
-      print("  [%] In RemoveIllegalMoves Loop 2, move: ", it_index); PrettyPrintMove(board, it);
-
       board2 := board;
       ApplyMoveToBoard(*board2, it);
       king_count = popcount(board2.fields[Piece.KING]);
-
-      if king_count < 2
-      {
-        log("    !!!  king count: %", king_count);
-        break;
-      }
+      if king_count < 2 break;
     }
 
     // if king_count == 1 then it's a pat? IDK? it's legal i guess?
@@ -376,6 +367,7 @@ main :: ()
 #import "Basic";
 #import "Bit_Operations";
 #import "String";
+#import "Sort";
 #if OS == .WINDOWS {
   #import "Windows";
 } else {

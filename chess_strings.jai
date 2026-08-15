@@ -40,6 +40,8 @@ MovePrintSpec :: struct
   board: Board;
   piece: bool;
   indices: bool;
+  sort: bool;
+  separator := "\n";
 }
 
 append :: (builder: *String_Builder, move: Move, spec := MovePrintSpec.{})
@@ -73,14 +75,26 @@ append :: (builder: *String_Builder, move: Move, spec := MovePrintSpec.{})
   }
 }
 
-MoveArrayToString :: (moves: MoveArray, spec := MovePrintSpec.{}) -> string
+MoveArrayToString :: (moves_: MoveArray, spec := MovePrintSpec.{}) -> string
 {
+  moves := moves_;
+  if spec.sort
+  {
+    move_compare :: (a: Move, b: Move) -> int
+    {
+      delta := a.from - b.from;
+      if delta == 0 then a.to - b.to;
+      return delta;
+    }
+    quick_sort(to_view(moves), move_compare);
+  }
+
   builder: String_Builder;
   for moves
   {
     if spec.indices print_to_builder(*builder, "[%] ", it_index);
     append(*builder, it, spec);
-    append(*builder, "\n");
+    append(*builder, spec.separator);
   }
   return builder_to_string(*builder);
 }
