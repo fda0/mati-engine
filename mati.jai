@@ -117,7 +117,22 @@ BoardFromFen :: (text: string) -> Board
   }
 
   rest := Skip(text, processed_count);
-  if StartsWith(rest, "b") board.black_to_move = true;
+  color := Prefix(rest, Find(rest, " "));
+
+  rest = Skip(rest, color.count + 1);
+  castling := Prefix(rest, Find(rest, " "));
+
+  rest = Skip(rest, castling.count + 1);
+  en_passant := Prefix(rest, Find(rest, " "));
+
+  rest = Skip(rest, en_passant.count + 1);
+  halfmove := Prefix(rest, Find(rest, " "));
+
+  rest = Skip(rest, halfmove.count + 1);
+  fullmove := rest;
+
+  board.black_to_move = color == "b";
+  board.en_passant_square = ParseSquare(en_passant, validate = true);
 
   return board;
 }

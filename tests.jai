@@ -10,10 +10,11 @@ OneMoveFENTests :: ()
 {
   // En passant
   {
-    board := BoardFromFen("rnbqkbnr/ppp2ppp/4p3/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3");
+    board := BoardFromFen("k7/8/8/5pP1/8/8/8/1K6 w - f6 0 40");
     moves := LegalMovesFromBoard(board);
-    moves_str := MoveArrayToString(moves);
-    log("en_passant moves:\n%", moves_str);
+    moves_str := MoveArrayToString(moves, {board=board, piece=true});
+    log("en_passant board: %, moves:\n%", board, moves_str);
+    assert(Contains(moves_str, "White PAWN g5f6"));
   }
 
   AVOID_CHECK_FEN :: "2rkr3/8/8/8/8/8/8/3K4 w - - 0 1";
