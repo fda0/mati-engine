@@ -70,8 +70,9 @@ PieceFlagsFromPiece :: (piece: Piece) -> PieceFlags { return xx (1 << piece); }
 SquareFromVec2 :: inline (vec: Vec2) -> Square { return xx (vec.y*8 + vec.x); }
 Vec2FromSquare :: inline (s: Square) -> Vec2 { return {xx (s & 7), xx (s >> 3)}; }
 IsValidSquare :: inline (s: Square) -> bool { return s < 64 && s >= 0; }
-FieldFromSquare :: inline (s: Square) -> Field
+FieldFromSquare :: inline (s: Square, validate := false) -> Field
 {
+  if validate && !IsValidSquare(s) return 0;
   assert(IsValidSquare(s));
   return (cast(u64)1) << s;
 }
@@ -152,14 +153,16 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
   moves: MoveArray;
   our_color_mask := ifx board.black_to_move then board.is_black else ~board.is_black;
 
-  our_field_sum: Field;
-  enemy_field_sum: Field;
+  our_fields: Field;
+  enemy_fields: Field;
   for board.fields
   {
-    our_field_sum |= it & our_color_mask;
-    enemy_field_sum |= it & ~our_color_mask;
+    our_fields |= it & our_color_mask;
+    enemy_fields |= it & ~our_color_mask;
   }
-  both_teams_field_sum := our_field_sum | enemy_field_sum;
+
+  both_teams_fields := our_fields | enemy_fields;
+  enemy_fields_en_passant := enemy_fields | FieldFromSquare(board.en_passant_square, validate = true);
 
   AddMoveNotInField :: (from: Square, to: Square, exclude_field: Field,
                         row_check: Square = INVALID_SQUARE, is_pawn := false) -> bool #expand
@@ -180,7 +183,7 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
           }
 
           for promotions add(*moves, {from, to, it});
-          continue_moving = (to_field & enemy_field_sum) == 0;
+          continue_moving = (to_field & enemy_fields) == 0;
         }
       }
     }
@@ -189,7 +192,7 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
 
   AddMove :: (from: Square, to: Square, row_check: Square = INVALID_SQUARE) -> bool #expand
   {
-    return AddMoveNotInField(from, to, our_field_sum, row_check);
+    return AddMoveNotInField(from, to, our_fields, row_check);
   }
 
   for field, piece_idx: board.fields
@@ -206,19 +209,19 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
       // PAWN moves
       if piece_flag & .PAWN_FLAG
       {
-        direction := ifx board.black_to_move then 1 else -1;
+        dir := ifx board.black_to_move then 1 else -1;
         pawn_starting_row := ifx board.black_to_move then ROW_1 else ROW_6;
         move_count := 1 + ifx IsSameRow(current, pawn_starting_row) then 1;
 
         // Forward moves (no captures)
         for 1 .. move_count
         {
-          if !AddMoveNotInField(current, xx (current + 8*it*direction), both_teams_field_sum, is_pawn = true) break;
+          if !AddMoveNotInField(current, xx (current + 8*it*dir), both_teams_fields, is_pawn = true) break;
         }
 
         // Diagonal moves (captures)
-        AddMoveNotInField(current, xx (current + 8*direction - 1), ~enemy_field_sum, xx (current + 8*direction), is_pawn = true);
-        AddMoveNotInField(current, xx (current + 8*direction + 1), ~enemy_field_sum, xx (current + 8*direction), is_pawn = true);
+        AddMoveNotInField(current, xx (current + 8*dir - 1), ~enemy_fields_en_passant, xx (current + 8*dir), is_pawn = true);
+        AddMoveNotInField(current, xx (current + 8*dir + 1), ~enemy_fields_en_passant, xx (current + 8*dir), is_pawn = true);
       }
 
       // Side moves (ROOK, QUEEN, KING)
