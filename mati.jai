@@ -52,6 +52,7 @@ Move :: struct
   to: Square;
   promotion: Piece;
 }
+
 MoveArray :: FixedArray(Move, 256);
 
 // Global constants
@@ -320,33 +321,6 @@ ApplyMoveToBoard :: (board: *Board, move: Move)
   board.black_to_move = !board.black_to_move;
 }
 
-PrettyPrintVec2 :: (vec: Vec2)
-{
-  char := (vec.x + #char "A").(u8);
-  str := string.{data = *char, count = 1};
-  print("%%", str, 8 - vec.y);
-}
-
-PrettyPrintMove :: (board: Board, move: Move)
-{
-  from_field := FieldFromSquare(move.from);
-  for board.fields
-  {
-    if it & from_field
-    {
-      color := ifx from_field & board.is_black then "Black" else "White";
-      print("% % ", color, it_index.(Piece));
-    }
-  }
-
-  from_pos := Vec2FromSquare(move.from);
-  to_pos := Vec2FromSquare(move.to);
-  PrettyPrintVec2(from_pos);
-  print(" -> ");
-  PrettyPrintVec2(to_pos);
-  print("\n");
-}
-
 FullRandomNumber :: () -> u64
 {
   rng_state ^= rng_state << 13;
@@ -365,34 +339,19 @@ main :: ()
   rng_state = current_time_monotonic().low | 1;
   rng_state = 1129873231; // init rng state for debugging
 
-  test_init_moves: bool;
-
   args := get_command_line_arguments();
   for args
   {
     if it_index == 0 continue;
 
-    if it == "test" test_init_moves = true;
-  }
-
-  if test_init_moves
-  {
-    AVOID_CHECK_FEN :: "2rkr3/8/8/8/8/8/8/3K4 w - - 0 1";
-    TEST_FEN :: "2b1n1k1/nr6/8/N1pp3R/3B1pB1/1p4p1/5p2/3K4 b - - 5 62";
-    // board := BoardFromFen(INIT_BOARD_FEN);
-    board := BoardFromFen(TEST_FEN);
-
-    moves := LegalMovesFromBoard(board);
-    for moves
+    if it == "test"
     {
-      print("[move %] ", it_index);
-      PrettyPrintMove(board, it);
+      RunTests();
+      exit(0);
     }
   }
-  else
-  {
-    UciLoop();
-  }
+
+  UciLoop();
 }
 
 // Imports
@@ -406,5 +365,7 @@ main :: ()
 }
 
 #load "uci.jai";
+#load "chess_strings.jai";
+#load "tests.jai";
 #load "base_fixed_array.jai";
 #load "base_string.jai";
