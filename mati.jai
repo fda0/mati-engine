@@ -223,12 +223,12 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
   if board.black_to_move
   {
     if (board.castling_rights & .BLACK_QUEENSIDE) castling_queen = BLACK_CASTLE_Q_MASK;
-    if (board.castling_rights & .BLACK_KINGSIDE)  castling_queen = BLACK_CASTLE_K_MASK;
+    if (board.castling_rights & .BLACK_KINGSIDE)  castling_king  = BLACK_CASTLE_K_MASK;
   }
   else
   {
     if (board.castling_rights & .WHITE_QUEENSIDE) castling_queen = WHITE_CASTLE_Q_MASK;
-    if (board.castling_rights & .WHITE_KINGSIDE)  castling_queen = WHITE_CASTLE_K_MASK;
+    if (board.castling_rights & .WHITE_KINGSIDE)  castling_king  = WHITE_CASTLE_K_MASK;
   }
 
   AddMoveNotInField :: (from: Square, to: Square, exclude_field: Field,

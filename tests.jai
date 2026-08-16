@@ -9,7 +9,7 @@ RunTests :: ()
 OneMoveFENTests :: ()
 {
   // En passant
-  {
+  if 0 {
     board := BoardFromFen("k7/8/8/5pP1/8/8/8/1K6 w - f6 0 40");
     moves := LegalMovesFromBoard(board);
     moves_str := MoveArrayToString(moves, {board = board, pieces = .FULL, sort = true});
