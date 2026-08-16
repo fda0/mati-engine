@@ -28,7 +28,7 @@ OneMoveFENTests :: ()
     Test("Black's queenside castling is illegal");
     moves := TestMoves("r3k2r/p6p/8/8/8/8/P6P/3RK2R b Kkq - 1 1");
     Check(Contains(moves, "k e8g8"));
-    Check(Contains(moves, "k e8c8") == false);
+    Check(Contains(moves, "k e8c8") == false); // @todo this fails
   }
 
   {
@@ -54,9 +54,9 @@ Test :: (label: string) #expand
   test_label = label;
   test_passed = true;
 
-  `defer if test_passed
+  `defer
   {
-    log("[%] PASS: %", test_counter, test_label);
+    if test_passed log("[%] PASS: %", test_counter, test_label);
     test_counter += 1;
   }
 }
