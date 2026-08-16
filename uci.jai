@@ -66,8 +66,8 @@ UciLoop :: ()
 
     if first == {
       case "uci";
-      print("id name Mati-Engine\n");
-      print("id author Mateusz Garbowski\n");
+      print("id name %\n", ENGINE_NAME);
+      print("id author Ojciec Mateusz\n");
       print("uciok\n");
 
       case "isready";

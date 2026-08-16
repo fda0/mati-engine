@@ -1,3 +1,19 @@
+ENGINE_NAME :: #run sprint("Mati-Engine %: Random edition", VERSION);
+
+MAJOR_VERSION :: 0;
+
+VERSION :: #run -> string {
+  #import "Process";
+  version := sprint("%", MAJOR_VERSION);
+
+  _, revision := run_command("git", "rev-parse", "--short", "HEAD", capture_and_return_output = true);
+  _, status := run_command("git", "status", "--porcelain", capture_and_return_output = true);
+  if revision then version = sprint("%-%%", version, StripWhite(revision), ifx StripWhite(status) then "*");
+
+  log("Engine version: %", version);
+  return version;
+}
+
 // Types
 Piece :: enum u8
 {
@@ -133,6 +149,10 @@ BoardFromFen :: (text: string) -> Board
   fullmove := rest;
 
   board.black_to_move = color == "b";
+  if Contains(castling, "K") board.castling_rights |= .WHITE_KINGSIDE;
+  if Contains(castling, "Q") board.castling_rights |= .WHITE_QUEENSIDE;
+  if Contains(castling, "k") board.castling_rights |= .BLACK_KINGSIDE;
+  if Contains(castling, "q") board.castling_rights |= .BLACK_QUEENSIDE;
   board.en_passant_square = ParseSquare(en_passant, validate = true);
 
   return board;
