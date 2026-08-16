@@ -31,21 +31,21 @@ UciSetPosition :: (board: *Board, content: string)
   }
   else if StartsWith(content, "fen")
   {
-    fen := StripWhite(Skip(content, 3));
+    fen := Trim(Skip(content, 3));
     board.* = BoardFromFen(fen);
   }
 
   moves_offset, moves_found := Find(content, "moves", .FindAddNeedleCountOnSuccess);
   if moves_found
   {
-    all_moves := StripWhite(Skip(content, moves_offset));
+    all_moves := Trim(Skip(content, moves_offset));
     while all_moves
     {
       move_str := Prefix(all_moves, Find(all_moves, " ", .FindAddHaystackCountOnFail));
       move  := ParseMove(move_str);
       ApplyMoveToBoard(board, move);
 
-      all_moves = StripWhite(Skip(all_moves, move_str.count));
+      all_moves = Trim(Skip(all_moves, move_str.count));
     }
   }
 }
@@ -58,11 +58,11 @@ UciLoop :: ()
     line, ok := UciReadLine();
     if !ok break;
 
-    line = StripWhite(line);
+    line = Trim(line);
     if !line continue;
 
     first := Prefix(line, Find(line, " ", .FindAddHaystackCountOnFail));
-    second := StripWhite(Skip(line, first.count + 1));
+    second := Trim(Skip(line, first.count + 1));
 
     if first == {
       case "uci";

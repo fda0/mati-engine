@@ -210,7 +210,7 @@ Contains :: (haystack: string, needle: string, flags: MatchFlags = 0) -> bool
   return found;
 }
 
-StripWhite :: (str: string) -> string
+Trim :: (str: string) -> string
 {
   res := str;
   while res.count > 0 && IsWhite(res.data[0]) {

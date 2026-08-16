@@ -1,16 +1,18 @@
-ENGINE_NAME :: #run sprint("Mati-Engine %: Random edition", VERSION);
-
 MAJOR_VERSION :: 0;
+SUBTITLE :: "Random edition";
+
+ENGINE_NAME :: #run -> string {
+  result := sprint("Mati %: %", VERSION, SUBTITLE);
+  log("Engine name: %", result);
+  return result;
+}
 
 VERSION :: #run -> string {
   #import "Process";
   version := sprint("%", MAJOR_VERSION);
-
   _, revision := run_command("git", "rev-parse", "--short", "HEAD", capture_and_return_output = true);
   _, status := run_command("git", "status", "--porcelain", capture_and_return_output = true);
-  if revision then version = sprint("%-%%", version, StripWhite(revision), ifx StripWhite(status) then "*");
-
-  log("Engine version: %", version);
+  if revision then version = sprint("% [%%]", version, Trim(revision), ifx Trim(status) then "*");
   return version;
 }
 
