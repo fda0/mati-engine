@@ -1,19 +1,10 @@
-ParseSquare :: (text: string, validate := false) -> Square
+ParseSquare :: (text: string) -> Square
 {
-  if validate
-  {
-    if text.count < 2 || !IsAlpha(text[0]) || !IsDigit(text[1])
-    {
-      return INVALID_SQUARE;
-    }
-  }
-
-  assert(text.count >= 2);
+  if text.count < 2 return INVALID_SQUARE;
   x := text[0] - #char "a";
   y := text[1] - #char "1";
-  result := ((7 - y) * 8 + x).(Square);
-  assert(IsValidSquare(result));
-  return result;
+  if x < 0 || x > 7 || y < 0 || y > 7 return INVALID_SQUARE;
+  return ((7 - y) * 8 + x).(Square);
 }
 
 ParseMove :: (text: string) -> Move

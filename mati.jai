@@ -88,12 +88,22 @@ PieceFlagsFromPiece :: (piece: Piece) -> PieceFlags { return xx (1 << piece); }
 SquareFromVec2 :: inline (vec: Vec2) -> Square { return xx (vec.y*8 + vec.x); }
 Vec2FromSquare :: inline (s: Square) -> Vec2 { return {xx (s & 7), xx (s >> 3)}; }
 IsValidSquare :: inline (s: Square) -> bool { return s < 64 && s >= 0; }
-FieldFromSquare :: inline (s: Square, validate := false) -> Field
+IsSameRow :: inline (from: Square, to: Square) -> bool { return ((from ^ to) & (~7)) == 0; }
+
+FieldFromSquare :: inline (square: Square) -> Field
 {
-  if validate && !IsValidSquare(s) return 0;
-  assert(IsValidSquare(s));
-  return (cast(u64)1) << s;
+  field: Field;
+  if IsValidSquare(square) field = (cast(u64)1) << square;
+  return field;
 }
+
+FieldFromSquares :: inline (squares: ..Square) -> Field
+{
+  field: Field;
+  for squares if IsValidSquare(it) field |= (cast(u64)1) << it;
+  return field;
+}
+
 FieldFromVec2 :: inline (vec: Vec2) -> Field { return FieldFromSquare(SquareFromVec2(vec)); }
 FirstSquareInField :: inline (field: Field) -> Square { return xx (bit_scan_forward(field) - 1); }
 
@@ -155,18 +165,13 @@ BoardFromFen :: (text: string) -> Board
   if Contains(castling, "Q") board.castling_rights |= .WHITE_QUEENSIDE;
   if Contains(castling, "k") board.castling_rights |= .BLACK_KINGSIDE;
   if Contains(castling, "q") board.castling_rights |= .BLACK_QUEENSIDE;
-  board.en_passant_square = ParseSquare(en_passant, validate = true);
+  board.en_passant_square = ParseSquare(en_passant);
 
   return board;
 }
 
 AllMovesFromBoard :: (board: Board) -> MoveArray
 {
-  IsSameRow :: inline (from: Square, to: Square) -> bool
-  {
-    return ((from ^ to) & (~7)) == 0;
-  }
-
   ROW_0 :: #run SquareFromVec2({0, 0});
   ROW_1 :: #run SquareFromVec2({0, 1});
   ROW_6 :: #run SquareFromVec2({0, 6});
@@ -184,7 +189,25 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
   }
 
   both_teams_fields := our_fields | enemy_fields;
-  enemy_fields_en_passant := enemy_fields | FieldFromSquare(board.en_passant_square, validate = true);
+  enemy_fields_en_passant := enemy_fields | FieldFromSquare(board.en_passant_square);
+
+  WHITE_CASTLE_Q_MASK :: #run FieldFromSquares(ParseSquare("b1"), ParseSquare("c1"), ParseSquare("d1"));
+  WHITE_CASTLE_K_MASK :: #run FieldFromSquares(ParseSquare("f1"), ParseSquare("g1"));
+  BLACK_CASTLE_Q_MASK :: #run FieldFromSquares(ParseSquare("b8"), ParseSquare("c8"), ParseSquare("d8"));
+  BLACK_CASTLE_K_MASK :: #run FieldFromSquares(ParseSquare("f8"), ParseSquare("g8"));
+
+  castling_queen: Field;
+  castling_king: Field;
+  if board.black_to_move
+  {
+    if (board.castling_rights & .BLACK_QUEENSIDE) castling_queen = BLACK_CASTLE_Q_MASK;
+    if (board.castling_rights & .BLACK_KINGSIDE)  castling_queen = BLACK_CASTLE_K_MASK;
+  }
+  else
+  {
+    if (board.castling_rights & .WHITE_QUEENSIDE) castling_queen = WHITE_CASTLE_Q_MASK;
+    if (board.castling_rights & .WHITE_KINGSIDE)  castling_queen = WHITE_CASTLE_K_MASK;
+  }
 
   AddMoveNotInField :: (from: Square, to: Square, exclude_field: Field,
                         row_check: Square = INVALID_SQUARE, is_pawn := false) -> bool #expand
@@ -275,6 +298,8 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
         AddMove(current, current - 8 + 2, current-8);
         AddMove(current, current + 8 - 2, current+8);
         AddMove(current, current + 8 + 2, current+8);
+
+
       }
     }
   }
