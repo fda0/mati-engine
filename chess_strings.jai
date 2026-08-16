@@ -29,7 +29,7 @@ ParseMove :: (text: string) -> Move
 MovePrintSpec :: struct
 {
   board: Board;
-  piece: bool;
+  pieces: enum { HIDE; FULL; SHORT; }
   indices: bool;
   sort: bool;
   separator := "\n";
@@ -40,16 +40,24 @@ append :: (builder: *String_Builder, move: Move, spec := MovePrintSpec.{})
   from := Vec2FromSquare(move.from);
   to := Vec2FromSquare(move.to);
 
-  if spec.piece
+  if spec.pieces != .HIDE
   {
     from_field := FieldFromSquare(move.from);
-
     for spec.board.fields
     {
       if it & from_field
       {
-        color := ifx from_field & spec.board.is_black then "Black" else "White";
-        print_to_builder(builder, "% % ", color, it_index.(Piece));
+        if spec.pieces == .FULL
+        {
+          color := ifx from_field & spec.board.is_black then "BLACK" else "WHITE";
+          print_to_builder(builder, "% % ", color, it_index.(Piece));
+        }
+        if spec.pieces == .SHORT
+        {
+          letter := PieceLetters[it_index];
+          if !(from_field & spec.board.is_black) letter = ToUpper(letter);
+          print_to_builder(builder, "% ", ByteStr(*letter));
+        }
       }
     }
   }
@@ -88,31 +96,4 @@ MoveArrayToString :: (moves_: MoveArray, spec := MovePrintSpec.{}) -> string
     append(*builder, spec.separator);
   }
   return builder_to_string(*builder);
-}
-
-PrettyPrintVec2 :: (vec: Vec2)
-{
-  char := (vec.x + #char "A").(u8);
-  str := string.{data = *char, count = 1};
-  print("%%", str, 8 - vec.y);
-}
-
-PrettyPrintMove :: (board: Board, move: Move)
-{
-  from_field := FieldFromSquare(move.from);
-  for board.fields
-  {
-    if it & from_field
-    {
-      color := ifx from_field & board.is_black then "Black" else "White";
-      print("% % ", color, it_index.(Piece));
-    }
-  }
-
-  from_pos := Vec2FromSquare(move.from);
-  to_pos := Vec2FromSquare(move.to);
-  PrettyPrintVec2(from_pos);
-  print(" -> ");
-  PrettyPrintVec2(to_pos);
-  print("\n");
 }

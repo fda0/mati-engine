@@ -72,6 +72,8 @@ Suffix :: (str: string, count: s64) -> string
   return res;
 }
 
+ByteStr :: (b: *u8) -> string { return string.{data = b, count = 1}; }
+
 StartsWith :: (haystack: string, needle: string, flags: MatchFlags = 0) -> bool
 {
   h := Prefix(haystack, needle.count);
@@ -119,6 +121,14 @@ ToLower :: (b: u8) -> u8
   if b >= #char "A" && b <= #char "Z"
   {
     b += (#char "a" - #char "A").(u8);
+  }
+  return b;
+}
+ToUpper :: (b: u8) -> u8
+{
+  if b >= #char "a" && b <= #char "z"
+  {
+    b -= (#char "a" - #char "A").(u8);
   }
   return b;
 }

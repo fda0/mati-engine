@@ -25,7 +25,11 @@ Piece :: enum u8
   ROOK;
   QUEEN;
   KING;
+
+  INVALID;
 }
+
+PieceLetters :: "pnbrqk";
 
 PieceFlags :: enum_flags u8
 {
@@ -43,6 +47,9 @@ CastlingRights :: enum_flags u8
   WHITE_QUEENSIDE;
   BLACK_KINGSIDE;
   BLACK_QUEENSIDE;
+
+  WHITE_BOTH :: WHITE_KINGSIDE | WHITE_QUEENSIDE;
+  BLACK_BOTH :: BLACK_KINGSIDE | BLACK_QUEENSIDE;
 }
 
 Field :: #type u64; // 8x8 bitfield - encodes occupancy for the whole board
@@ -54,7 +61,7 @@ Board :: struct
   is_black: Field;
 
   halfmove_clock: u16;
-  black_to_move: bool;
+  black_to_move: bool; // @todo look for readable tricks to reduce branching on this bool
   castling_rights: CastlingRights;
   en_passant_square: Square;
 }
@@ -74,7 +81,7 @@ Move :: struct
 MoveArray :: FixedArray(Move, 256);
 
 // Global constants
-PIECE_COUNT :: #run enum_highest_value(Piece) + 1;
+PIECE_COUNT :: 6;
 INVALID_SQUARE: Square : -128;
 
 INIT_BOARD_FEN :: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -83,12 +90,17 @@ INIT_BOARD_FEN :: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 rng_state: u64;
 
 // Functions
-PieceFlagsFromPiece :: (piece: Piece) -> PieceFlags { return xx (1 << piece); }
+PieceFlagsFromPiece :: (piece: Piece) -> PieceFlags
+{
+  if piece >= .INVALID return 0;
+  return xx (1 << piece);
+}
 
 SquareFromVec2 :: inline (vec: Vec2) -> Square { return xx (vec.y*8 + vec.x); }
 Vec2FromSquare :: inline (s: Square) -> Vec2 { return {xx (s & 7), xx (s >> 3)}; }
 IsValidSquare :: inline (s: Square) -> bool { return s < 64 && s >= 0; }
 IsSameRow :: inline (from: Square, to: Square) -> bool { return ((from ^ to) & (~7)) == 0; }
+ContainsSquare :: (m: Move, s: Square) -> bool { return m.from == s || m.to == s; }
 
 FieldFromSquare :: inline (square: Square) -> Field
 {
@@ -117,25 +129,35 @@ BoardFromFen :: (text: string) -> Board
   for text
   {
     defer processed_count += 1;
+    if it == " " break;
+
+    if it == #char "/"
+    {
+      pos.x = 0;
+      pos.y += 1;
+      continue;
+    }
+    else if IsDigit(it)
+    {
+      pos.x += ParseDigit(it);
+      continue;
+    }
 
     is_black := IsAlphaLower(it);
-    piece: Piece;
-    if ToLower(it) == {
-      case #char "p"; piece = .PAWN;
-      case #char "n"; piece = .KNIGHT;
-      case #char "b"; piece = .BISHOP;
-      case #char "r"; piece = .ROOK;
-      case #char "q"; piece = .QUEEN;
-      case #char "k"; piece = .KING;
-      case #char "/"; pos.x = 0; pos.y += 1; continue;
-
-      case;
-      if IsDigit(it)
+    piece := Piece.INVALID;
+    for letter, letter_idx: PieceLetters
+    {
+      if ToLower(it) == letter
       {
-        pos.x += ParseDigit(it);
-        continue;
+        piece = xx letter_idx;
+        break;
       }
-      if it == " " break;
+    }
+
+    if piece == .INVALID
+    {
+      log("Invalid fen: %", text);
+      return board;
     }
 
     field_bit := FieldFromVec2(pos);
@@ -196,8 +218,8 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
   BLACK_CASTLE_Q_MASK :: #run FieldFromSquares(ParseSquare("b8"), ParseSquare("c8"), ParseSquare("d8"));
   BLACK_CASTLE_K_MASK :: #run FieldFromSquares(ParseSquare("f8"), ParseSquare("g8"));
 
-  castling_queen: Field;
-  castling_king: Field;
+  castling_queen: Field = ~0;
+  castling_king: Field = ~0;
   if board.black_to_move
   {
     if (board.castling_rights & .BLACK_QUEENSIDE) castling_queen = BLACK_CASTLE_Q_MASK;
@@ -287,6 +309,12 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
       for 1 .. diagonal_moves if !AddMove(current, xx (current + 7*it), xx(current + 8*it)) break;
       for 1 .. diagonal_moves if !AddMove(current, xx (current + 9*it), xx(current + 8*it)) break;
 
+      if piece_flag & .KING_FLAG
+      {
+        if (both_teams_fields & castling_queen) == 0 then AddMove(current, current - 2);
+        if (both_teams_fields & castling_king)  == 0 then AddMove(current, current + 2);
+      }
+
       // Knight
       if piece_flag & .KNIGHT_FLAG
       {
@@ -298,8 +326,6 @@ AllMovesFromBoard :: (board: Board) -> MoveArray
         AddMove(current, current - 8 + 2, current-8);
         AddMove(current, current + 8 - 2, current+8);
         AddMove(current, current + 8 + 2, current+8);
-
-
       }
     }
   }
@@ -338,24 +364,24 @@ RemoveIllegalMoves :: (init_board: Board, moves: *MoveArray)
   }
 }
 
-ApplyMoveToBoard :: (board: *Board, move: Move)
+ApplyMoveToBoardHelper :: (board: *Board, move: Move) -> Piece
 {
   from_field := FieldFromSquare(move.from);
   to_field := FieldFromSquare(move.to);
 
-  moving_piece_index := -1;
+  moved_piece := Piece.INVALID;
   for * board.fields
   {
     if it.* & from_field
     {
-      assert(moving_piece_index < 0); // multiple pieces on move.from
-      moving_piece_index = it_index;
+      assert(moved_piece == .INVALID); // multiple pieces on move.from
+      moved_piece = xx it_index;
     }
     it.* &= ~to_field; // remove any captured piece
   }
-  assert(moving_piece_index >= 0); // no piece on move.from
+  assert(moved_piece != .INVALID); // no piece on move.from
 
-  board.fields[moving_piece_index] &= ~from_field;
+  board.fields[moved_piece] &= ~from_field; // bit we moved from needs to be cleared
 
   promotion_flag := PieceFlagsFromPiece(move.promotion);
   if promotion_flag & (.KNIGHT_FLAG | .BISHOP_FLAG | .ROOK_FLAG | .QUEEN_FLAG)
@@ -364,15 +390,48 @@ ApplyMoveToBoard :: (board: *Board, move: Move)
   }
   else
   {
-    board.fields[moving_piece_index] |= to_field;
+    board.fields[moved_piece] |= to_field;
   }
 
   board.is_black &= ~to_field;
   if from_field & board.is_black
   {
-    board.is_black &= ~from_field;
+    board.is_black &= ~from_field; // lets keep empty fields white (not strictly needed)
     board.is_black |= to_field;
   }
+
+  return moved_piece;
+}
+
+ApplyMoveToBoard :: (board: *Board, move: Move)
+{
+  moved_piece := ApplyMoveToBoardHelper(board, move);
+
+  ROOK_WK :: #run ParseSquare("h1");
+  ROOK_WQ :: #run ParseSquare("a1");
+  ROOK_BK :: #run ParseSquare("h8");
+  ROOK_BQ :: #run ParseSquare("a8");
+
+  // apply castling
+  if moved_piece == .KING
+  {
+    delta_x := move.to - move.from;
+    if      delta_x ==  2 then ApplyMoveToBoardHelper(board, {from = move.from + 3, to = move.to - 1});
+    else if delta_x == -2 then ApplyMoveToBoardHelper(board, {from = move.from - 4, to = move.to + 1});
+  }
+
+  // Clear castling on king move
+  if moved_piece == .KING
+  {
+    if board.black_to_move then board.castling_rights &= ~.BLACK_BOTH;
+    else                        board.castling_rights &= ~.WHITE_BOTH;
+  }
+
+  // Clear castling on rook move / capture
+  if ContainsSquare(move, ROOK_WK) board.castling_rights &= ~.WHITE_KINGSIDE;
+  if ContainsSquare(move, ROOK_WQ) board.castling_rights &= ~.WHITE_QUEENSIDE;
+  if ContainsSquare(move, ROOK_BK) board.castling_rights &= ~.BLACK_KINGSIDE;
+  if ContainsSquare(move, ROOK_BQ) board.castling_rights &= ~.BLACK_QUEENSIDE;
 
   board.black_to_move = !board.black_to_move;
 }
