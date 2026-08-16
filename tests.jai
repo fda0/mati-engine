@@ -15,7 +15,11 @@ OneMoveFENTests :: ()
     Check(Contains(moves, "P g5f6"));
   }
 
-  AVOID_CHECK_FEN :: "2rkr3/8/8/8/8/8/8/3K4 w - - 0 1";
+  {
+    Test("Avoid check");
+    moves := TestMoves("2rkr3/8/8/8/8/8/8/3K4 w - - 0 1");
+    Check(moves == "K d1d2");
+  }
 
   {
     Test("White can do both castlings");
@@ -57,6 +61,7 @@ Test :: (label: string) #expand
   `defer
   {
     if test_passed log("[%] PASS: %", test_counter, test_label);
+    test_label = "";
     test_counter += 1;
   }
 }

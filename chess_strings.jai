@@ -91,9 +91,9 @@ MoveArrayToString :: (moves_: MoveArray, spec := MovePrintSpec.{}) -> string
   builder: String_Builder;
   for moves
   {
+    if it_index > 0 append(*builder, spec.separator);
     if spec.indices print_to_builder(*builder, "[%] ", it_index);
     append(*builder, it, spec);
-    append(*builder, spec.separator);
   }
   return builder_to_string(*builder);
 }
