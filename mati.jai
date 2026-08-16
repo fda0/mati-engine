@@ -3,7 +3,7 @@ SUBTITLE :: "Random edition";
 
 ENGINE_NAME :: #run -> string {
   result := sprint("Mati %: %", VERSION, SUBTITLE);
-  log("Engine name: %", result);
+  log("  - - - % - - -", result);
   return result;
 }
 
