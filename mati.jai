@@ -359,6 +359,7 @@ RemoveIllegalMoves :: (init_board: Board, moves: *MoveArray)
     #if DEBUG log("ocm: %", formatInt(our_color_mask, base=2));
     #if DEBUG log("okf.a: %", formatInt(our_king_field, base=2));
     our_king_field |= FieldFromSquare(castling_rook);
+    #if DEBUG log("castling_rook: %", castling_rook);
     #if DEBUG log("okf.b: %", formatInt(our_king_field, base=2));
 
     illegal := false;
@@ -434,14 +435,14 @@ ApplyMoveToBoard :: (board: *Board, move: Move) -> castling_rook: Square
   if moved_piece == .KING
   {
     delta_x := move.to - move.from;
-    if delta_x ==  2
+    if delta_x == 2
     {
       castling_rook = move.to - 1;
       ApplyMoveToBoardHelper(board, {from = move.from + 3, to = castling_rook});
     }
     if delta_x == -2
     {
-      castling_rook := move.to + 1;
+      castling_rook = move.to + 1;
       ApplyMoveToBoardHelper(board, {from = move.from - 4, to = castling_rook});
     }
   }
