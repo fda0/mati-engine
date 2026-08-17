@@ -342,7 +342,7 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
 
 RemoveIllegalMoves :: (init_board: Board, moves: *MoveArray)
 {
-  DEBUG :: true;
+  DEBUG :: false;
 
   for * moves.*
   {
@@ -350,12 +350,16 @@ RemoveIllegalMoves :: (init_board: Board, moves: *MoveArray)
 
     #if DEBUG log("  RIM [%] testing move %", it_index, MoveToString(it, {board=board, pieces=.SHORT}));
 
-    our_color_mask := board.is_black;
-    if !board.black_to_move then our_color_mask = ~our_color_mask;
-
     castling_rook := ApplyMoveToBoard(*board, it);
+    our_color_mask := board.is_black;
+    if board.black_to_move then our_color_mask = ~our_color_mask;
+
     our_king_field := board.fields[Piece.KING] & our_color_mask;
+    #if DEBUG log("bk: %", formatInt(board.fields[Piece.KING], base=2));
+    #if DEBUG log("ocm: %", formatInt(our_color_mask, base=2));
+    #if DEBUG log("okf.a: %", formatInt(our_king_field, base=2));
     our_king_field |= FieldFromSquare(castling_rook);
+    #if DEBUG log("okf.b: %", formatInt(our_king_field, base=2));
 
     illegal := false;
     moves2 := AllMovesFromBoard(board);
