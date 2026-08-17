@@ -2,17 +2,17 @@ MAJOR_VERSION :: 0;
 SUBTITLE :: "Random edition";
 
 ENGINE_NAME :: #run -> string {
-  result := sprint("Mati %: %", VERSION, SUBTITLE);
+  result := sprint("Mati Engine %: %%", MAJOR_VERSION, SUBTITLE, GIT_REVISION);
   log("  - - - % - - -", result);
   return result;
 }
 
-VERSION :: #run -> string {
+GIT_REVISION :: #run -> string {
   #import "Process";
-  version := sprint("%", MAJOR_VERSION);
+  version: string;
   _, revision := run_command("git", "rev-parse", "--short", "HEAD", capture_and_return_output = true);
   _, status := run_command("git", "status", "--porcelain", capture_and_return_output = true);
-  if revision then version = sprint("% [%%]", version, Trim(revision), ifx Trim(status) then "*");
+  if revision then version = sprint(" [%%]", Trim(revision), ifx Trim(status) then "*");
   return version;
 }
 
@@ -342,25 +342,38 @@ LegalMovesFromBoard :: (board: Board) -> MoveArray
 
 RemoveIllegalMoves :: (init_board: Board, moves: *MoveArray)
 {
+  DEBUG :: true;
+
   for * moves.*
   {
     board := init_board;
-    ApplyMoveToBoard(*board, it);
 
-    king_count := popcount(board.fields[Piece.KING]);
-    assert(king_count == 2);
+    #if DEBUG log("  RIM [%] testing move %", it_index, MoveToString(it, {board=board, pieces=.SHORT}));
 
+    our_color_mask := board.is_black;
+    if !board.black_to_move then our_color_mask = ~our_color_mask;
+
+    castling_rook := ApplyMoveToBoard(*board, it);
+    our_king_field := board.fields[Piece.KING] & our_color_mask;
+    our_king_field |= FieldFromSquare(castling_rook);
+
+    illegal := false;
     moves2 := AllMovesFromBoard(board);
     for moves2
     {
-      board2 := board;
-      ApplyMoveToBoard(*board2, it);
-      king_count = popcount(board2.fields[Piece.KING]);
-      if king_count < 2 break;
+      #if DEBUG log("    RIM [%] against %", it_index, MoveToString(it, {board=board, pieces=.SHORT}));
+
+      enemy_field := FieldFromSquare(it.to);
+      if enemy_field & our_king_field
+      {
+        #if DEBUG log("    RIM [%] illegal move detected", it_index);
+        // enemy captured our king or castling square
+        illegal = true;
+        break;
+      }
     }
 
-    // if king_count == 1 then it's a pat? IDK? it's legal i guess?
-    if king_count < 2 then remove it;
+    if illegal then remove it;
   }
 }
 
@@ -403,7 +416,7 @@ ApplyMoveToBoardHelper :: (board: *Board, move: Move) -> Piece
   return moved_piece;
 }
 
-ApplyMoveToBoard :: (board: *Board, move: Move)
+ApplyMoveToBoard :: (board: *Board, move: Move) -> castling_rook: Square
 {
   moved_piece := ApplyMoveToBoardHelper(board, move);
 
@@ -413,11 +426,20 @@ ApplyMoveToBoard :: (board: *Board, move: Move)
   ROOK_BQ :: #run ParseSquare("a8");
 
   // apply castling
+  castling_rook := INVALID_SQUARE;
   if moved_piece == .KING
   {
     delta_x := move.to - move.from;
-    if      delta_x ==  2 then ApplyMoveToBoardHelper(board, {from = move.from + 3, to = move.to - 1});
-    else if delta_x == -2 then ApplyMoveToBoardHelper(board, {from = move.from - 4, to = move.to + 1});
+    if delta_x ==  2
+    {
+      castling_rook = move.to - 1;
+      ApplyMoveToBoardHelper(board, {from = move.from + 3, to = castling_rook});
+    }
+    if delta_x == -2
+    {
+      castling_rook := move.to + 1;
+      ApplyMoveToBoardHelper(board, {from = move.from - 4, to = castling_rook});
+    }
   }
 
   // Clear castling on king move
@@ -434,6 +456,7 @@ ApplyMoveToBoard :: (board: *Board, move: Move)
   if ContainsSquare(move, ROOK_BQ) board.castling_rights &= ~.BLACK_QUEENSIDE;
 
   board.black_to_move = !board.black_to_move;
+  return castling_rook;
 }
 
 FullRandomNumber :: () -> u64

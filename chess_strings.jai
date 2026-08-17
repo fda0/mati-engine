@@ -74,6 +74,13 @@ append :: (builder: *String_Builder, move: Move, spec := MovePrintSpec.{})
   }
 }
 
+MoveToString :: (move: Move, spec := MovePrintSpec.{}) -> string
+{
+  builder: String_Builder;
+  append(*builder, move, spec);
+  return builder_to_string(*builder);
+}
+
 MoveArrayToString :: (moves_: MoveArray, spec := MovePrintSpec.{}) -> string
 {
   moves := moves_;
